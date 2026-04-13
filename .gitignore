@@ -53,3 +53,6 @@ config.json
 *.app
 *.deb
 *.rpm
+
+# Local developer helper scripts (machine-specific paths, not for open source)
+_*.bat

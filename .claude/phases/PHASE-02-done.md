@@ -1,5 +1,5 @@
 # Phase 02 — Audio Pipeline Foundation
-Status: COMPLETE (code complete on work computer; STT model verification pending at home)
+Status: DONE — runtime verified on RTX 3080 (2026-04-14).
 
 ## Goal
 Ren can capture audio from the microphone, detect speech, transcribe it locally with Whisper, and display the transcript on screen.
@@ -96,9 +96,9 @@ npm run tauri dev             # if the dev runner does not forward features,
 ---
 
 ## Acceptance Criteria
-- [ ] First launch shows the download screen — *DownloadOverlay complete; the Rust download trigger lands in Phase 7.*
-- [ ] Holding Ctrl+Alt+R captures audio; releasing transcribes it — *Rust code complete; verify at home.*
-- [ ] Turkish speech is accurately transcribed — *verify at home.*
+- [ ] First launch shows the download screen — *UI complete; Rust download trigger deferred to Phase 7 first-run wizard.*
+- [x] Holding the PTT hotkey captures audio; releasing transcribes it — *hotkey migrated to Ctrl+Shift+Alt+R to avoid conflicts.*
+- [x] Turkish speech is accurately transcribed — *validated end-to-end on RTX 3080 with CUDA; Turkish-subtitle hallucination suppressed via `no_speech_thold` + `initial_prompt`.*
 - [x] Transcript appears in the UI below the orb.
 - [x] State transitions correctly reflect audio pipeline activity.
 - [x] Whisper loads lazily on first push-to-talk, not at startup.

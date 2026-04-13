@@ -1,5 +1,5 @@
 # Project Ren — Current State
-Last updated: 2026-04-13 (Phase 5 start)
+Last updated: 2026-04-14 (Phase 2 home-verified; runtime blockers cleared)
 
 ## Active Phase
 **Phase 5** — Tool system and first tool categories
@@ -8,7 +8,7 @@ Last updated: 2026-04-13 (Phase 5 start)
 | File | Status |
 |------|--------|
 | `.claude/phases/PHASE-01-done.md` | DONE |
-| `.claude/phases/PHASE-02-done.md` | DONE (home: STT model verification) |
+| `.claude/phases/PHASE-02-done.md` | DONE (home-verified: CUDA Whisper end-to-end Turkish) |
 | `.claude/phases/PHASE-03-done.md` | DONE (home: Ollama runtime + Kokoro ORT inference) |
 | `.claude/phases/PHASE-04-done.md` | DONE (home: Picovoice key + .ppn files) |
 | `.claude/phases/PHASE-05-active.md` | ACTIVE ← you are here |
@@ -70,13 +70,12 @@ Last updated: 2026-04-13 (Phase 5 start)
 
 ## Build Status
 - `npm run build` → ✅ clean
-- `cargo check` (no features) → expected to compile on the work machine once deps download
-- `cargo check --features stt` → needs C++ toolchain + CMake → home
+- `cargo check` (no features) → ✅ clean
+- `cargo check --features stt` → ✅ clean (Whisper 0.16 + CUDA 12.6, MSVC toolchain, LLVM libclang)
 - `cargo check --features tts` → needs ONNX Runtime native lib → home
 - `cargo check --features wake` → needs Picovoice native lib + access key → home
 
 ## What's Needed at Home
-- **Phase 2**: `cargo check --features stt`, download Whisper model, update SHA256 in `defaults.rs`, full PTT test.
 - **Phase 3**: Download Ollama binary + Kokoro ONNX, implement `KokoroEngine::synthesize()` ORT inference, full voice loop test.
 - **Phase 4**: Picovoice access key (`PICOVOICE_ACCESS_KEY` env var), train + bundle the two `.ppn` files, wire wake-engine consumer task into the audio pipeline, false-positive sanity check.
 

@@ -157,3 +157,28 @@ See `rules/common/decisions.md` for the logging format and rules.
 **Revisit if:** We add a tool with fundamentally different network semantics (long-poll, WebSocket, host-specific proxy).
 
 ---
+
+## 2026-04-14 — Bump `whisper-rs` 0.13 → 0.16
+**Chosen:** Upgraded `whisper-rs` from `0.13` to `0.16` (pulls `whisper-rs-sys` 0.13.1).
+**Alternatives:** Pin `whisper-rs-sys` to an older compatible point release; vendor whisper.cpp at a pinned commit.
+**Why:** `whisper-rs` 0.13.2 with `whisper-rs-sys` 0.11.1 emits an opaque `whisper_full_params` (`_address: u8`, size 264) under `bindgen` 0.69.5 on MSVC, producing 71 "unknown field" errors. 0.14.x moved to a size-assertion failure against the same bindgen output. 0.16 tracks a newer whisper.cpp release where the struct is fully representable by bindgen, compiling cleanly. Also unblocks the `cuda` feature which is mandatory for sub-second Turkish transcription on the target RTX-class hardware.
+**Trade-offs:** Minor API migration (`full_n_segments` loses its `Result`, segment text reads via `WhisperState::get_segment` + `WhisperSegment::to_str`) in `stt/whisper.rs`.
+**Revisit if:** A future whisper.cpp / `whisper-rs` release regresses opaque-struct handling or changes the `FullParams` API again.
+
+---
+
+## 2026-04-14 — Hotkeys: Ctrl+Alt+{R,S} → Ctrl+Shift+Alt+{R,S}
+**Chosen:** Push-to-talk is `Ctrl+Shift+Alt+R`; force-sleep is `Ctrl+Shift+Alt+S`.
+**Alternatives:** Keep the dual-modifier binding; fall back to alternate keys (`J`/`K`, function keys).
+**Why:** `Ctrl+Alt+R` collides with browser reload and several productivity tools, producing "HotKey already registered" errors at `GlobalHotKeyManager::register`. A triple-modifier chord is practically never bound by another application while remaining pronounceable.
+**Trade-offs:** Slightly harder to press single-handed; acceptable because the wake word is the primary trigger and the hotkey is only a fallback override.
+**Revisit if:** We observe user complaints about chord ergonomics or move PTT into a dedicated hardware button / tray menu.
+
+---
+
+## 2026-04-14 — `app_data_dir` uses `BaseDirs` + single `Ren` segment
+**Chosen:** Derive the data directory from `directories::BaseDirs::data_dir()` and append `Ren`, producing `%APPDATA%\Ren\` on Windows.
+**Alternatives:** Keep `ProjectDirs::from("com", "ren", "Ren")` which yields the XDG-style `%APPDATA%\ren\Ren\data\`.
+**Why:** Documentation across `CLAUDE.md`, `DEVPLAN.md`, and every phase file states `%APPDATA%\Ren\...` as the canonical layout. The `ProjectDirs` output diverged silently, breaking manual model placement and confusing first-run setup. A single-segment folder also matches Windows convention for native apps.
+**Trade-offs:** We lose cross-platform XDG compliance (irrelevant — Ren is Windows-only per stack decision); existing users (if any) must migrate manually.
+**Revisit if:** Ren ever targets macOS or Linux first-class, at which point a platform-specific resolver becomes necessary.
