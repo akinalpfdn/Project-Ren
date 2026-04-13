@@ -5,6 +5,7 @@
 
 import { Orb } from './components/Orb';
 import { Transcript } from './components/Transcript';
+import { ToolCard } from './components/ToolCard';
 import { DownloadOverlay } from './components/DownloadOverlay';
 import { useRenEvents } from './hooks/useRenEvents';
 import { useRenStore } from './store';
@@ -21,6 +22,7 @@ const App = () => {
 
   return (
     <main className={styles.stage}>
+      <ToolCard />
       <Orb />
       <Transcript />
     </main>

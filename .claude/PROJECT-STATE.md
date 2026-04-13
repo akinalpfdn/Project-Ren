@@ -1,19 +1,19 @@
 # Project Ren — Current State
-Last updated: 2026-04-13
+Last updated: 2026-04-13 (Phase 5 start)
 
 ## Active Phase
-**Phase 4** — Wake word detection + full conversation loop (work-computer code complete)
+**Phase 5** — Tool system and first tool categories
 
 ## Phase Files
 | File | Status |
 |------|--------|
-| `.claude/phases/PHASE-01-complete.md` | COMPLETE |
-| `.claude/phases/PHASE-02-complete.md` | COMPLETE (home: STT model verification) |
-| `.claude/phases/PHASE-03-complete.md` | COMPLETE (home: Ollama runtime + Kokoro ORT inference) |
-| `.claude/phases/PHASE-04-active.md` | ACTIVE ← you are here (home: Picovoice key + .ppn files) |
-| `.claude/phases/PHASE-05.md` | PENDING |
-| `.claude/phases/PHASE-06.md` | PENDING |
-| `.claude/phases/PHASE-07.md` | PENDING |
+| `.claude/phases/PHASE-01-done.md` | DONE |
+| `.claude/phases/PHASE-02-done.md` | DONE (home: STT model verification) |
+| `.claude/phases/PHASE-03-done.md` | DONE (home: Ollama runtime + Kokoro ORT inference) |
+| `.claude/phases/PHASE-04-done.md` | DONE (home: Picovoice key + .ppn files) |
+| `.claude/phases/PHASE-05-active.md` | ACTIVE ← you are here |
+| `.claude/phases/PHASE-06-pending.md` | PENDING |
+| `.claude/phases/PHASE-07-pending.md` | PENDING |
 
 ## What Exists in the Repo Right Now
 
@@ -81,4 +81,4 @@ Last updated: 2026-04-13
 - **Phase 4**: Picovoice access key (`PICOVOICE_ACCESS_KEY` env var), train + bundle the two `.ppn` files, wire wake-engine consumer task into the audio pipeline, false-positive sanity check.
 
 ## What Phase 5 Starts With
-Tool system: `Tool` trait, `ToolRegistry`, system / apps / Steam / files / web tool categories, frontend `ToolCard` component. See `PHASE-05.md`.
+Tool system: `Tool` trait, `ToolRegistry`, system / apps / Steam / files / web tool categories, frontend `ToolCard` component. See `PHASE-05-active.md`.

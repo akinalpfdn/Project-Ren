@@ -1,5 +1,5 @@
 # Phase 04 — Wake Word and Full Conversation Loop
-Status: ACTIVE (work-computer code complete; Picovoice runtime + .ppn files + access key pending at home)
+Status: DONE (work-computer code complete; Picovoice runtime + .ppn files + access key verified at home)
 
 ## Goal
 Ren is summoned by voice. The user says "Ren" or "Hey Ren", Ren wakes up, conversation proceeds naturally, Ren returns to sleep after inactivity or explicit dismissal.

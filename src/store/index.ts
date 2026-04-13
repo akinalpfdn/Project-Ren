@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { RenState, ErrorState } from '../types';
+import type { RenState, ErrorState, ToolActivity } from '../types';
 import { WAVEFORM_BAR_COUNT } from '../config/ui';
 
 export interface DownloadProgress {
@@ -16,6 +16,7 @@ interface RenStore {
   transcript: string | null;
   downloadProgress: DownloadProgress | null;
   waveformAmplitudes: number[];
+  toolActivity: ToolActivity | null;
 
   setState: (state: RenState) => void;
   setError: (error: ErrorState | null) => void;
@@ -24,6 +25,7 @@ interface RenStore {
   setTranscript: (text: string | null) => void;
   setDownloadProgress: (progress: DownloadProgress | null) => void;
   setWaveform: (amplitudes: number[]) => void;
+  setToolActivity: (activity: ToolActivity | null) => void;
 }
 
 export const useRenStore = create<RenStore>((set) => ({
@@ -33,6 +35,7 @@ export const useRenStore = create<RenStore>((set) => ({
   transcript: null,
   downloadProgress: null,
   waveformAmplitudes: Array<number>(WAVEFORM_BAR_COUNT).fill(0),
+  toolActivity: null,
 
   setState: (state) => set({ currentState: state, error: null }),
 
@@ -48,4 +51,6 @@ export const useRenStore = create<RenStore>((set) => ({
   setDownloadProgress: (progress) => set({ downloadProgress: progress }),
 
   setWaveform: (amplitudes) => set({ waveformAmplitudes: amplitudes }),
+
+  setToolActivity: (activity) => set({ toolActivity: activity }),
 }));

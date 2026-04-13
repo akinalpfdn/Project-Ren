@@ -7,13 +7,15 @@
 import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useRenStore } from '../store';
-import { TRANSCRIPT_VISIBLE_MS } from '../config/ui';
+import { TRANSCRIPT_VISIBLE_MS, TOOL_CARD_VISIBLE_MS } from '../config/ui';
 import type {
   StateChangedPayload,
   TranscriptPayload,
   DownloadProgressPayload,
   ErrorPayload,
   WaveformPayload,
+  ToolExecutingPayload,
+  ToolResultPayload,
 } from '../types';
 
 const EVT_STATE = 'ren://state-changed';
@@ -21,6 +23,8 @@ const EVT_TRANSCRIPT = 'ren://transcript';
 const EVT_DOWNLOAD = 'ren://download-progress';
 const EVT_ERROR = 'ren://error';
 const EVT_WAVEFORM = 'ren://waveform';
+const EVT_TOOL_EXECUTING = 'ren://tool-executing';
+const EVT_TOOL_RESULT = 'ren://tool-result';
 
 export const useRenEvents = () => {
   // Stable action references — Zustand guarantees these are referentially stable,
@@ -30,8 +34,10 @@ export const useRenEvents = () => {
   const setTranscript = useRenStore((s) => s.setTranscript);
   const setDownloadProgress = useRenStore((s) => s.setDownloadProgress);
   const setWaveform = useRenStore((s) => s.setWaveform);
+  const setToolActivity = useRenStore((s) => s.setToolActivity);
 
   const transcriptTimer = useRef<number | null>(null);
+  const toolCardTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const unlisten: Array<() => void> = [];
@@ -44,8 +50,15 @@ export const useRenEvents = () => {
       }
     };
 
+    const clearToolCardTimer = () => {
+      if (toolCardTimer.current !== null) {
+        window.clearTimeout(toolCardTimer.current);
+        toolCardTimer.current = null;
+      }
+    };
+
     const setup = async () => {
-      const [stateOff, transcriptOff, downloadOff, errorOff, waveOff] = await Promise.all([
+      const [stateOff, transcriptOff, downloadOff, errorOff, waveOff, toolExecOff, toolResOff] = await Promise.all([
         listen<StateChangedPayload>(EVT_STATE, (e) => setState(e.payload.state)),
 
         listen<TranscriptPayload>(EVT_TRANSCRIPT, (e) => {
@@ -77,6 +90,30 @@ export const useRenEvents = () => {
         ),
 
         listen<WaveformPayload>(EVT_WAVEFORM, (e) => setWaveform(e.payload.amplitudes)),
+
+        listen<ToolExecutingPayload>(EVT_TOOL_EXECUTING, (e) => {
+          clearToolCardTimer();
+          setToolActivity({
+            tool: e.payload.tool,
+            status: 'running',
+            message: e.payload.description,
+            startedAt: Date.now(),
+          });
+        }),
+
+        listen<ToolResultPayload>(EVT_TOOL_RESULT, (e) => {
+          setToolActivity({
+            tool: e.payload.tool,
+            status: e.payload.success ? 'success' : 'failure',
+            message: e.payload.summary,
+            startedAt: Date.now(),
+          });
+          clearToolCardTimer();
+          toolCardTimer.current = window.setTimeout(() => {
+            setToolActivity(null);
+            toolCardTimer.current = null;
+          }, TOOL_CARD_VISIBLE_MS);
+        }),
       ]);
 
       // If unmounted while awaiting, drop subscriptions immediately.
@@ -86,10 +123,12 @@ export const useRenEvents = () => {
         downloadOff();
         errorOff();
         waveOff();
+        toolExecOff();
+        toolResOff();
         return;
       }
 
-      unlisten.push(stateOff, transcriptOff, downloadOff, errorOff, waveOff);
+      unlisten.push(stateOff, transcriptOff, downloadOff, errorOff, waveOff, toolExecOff, toolResOff);
     };
 
     setup();
@@ -97,7 +136,8 @@ export const useRenEvents = () => {
     return () => {
       cancelled = true;
       clearTranscriptTimer();
+      clearToolCardTimer();
       unlisten.forEach((off) => off());
     };
-  }, [setState, setError, setTranscript, setDownloadProgress, setWaveform]);
+  }, [setState, setError, setTranscript, setDownloadProgress, setWaveform, setToolActivity]);
 };

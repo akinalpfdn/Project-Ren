@@ -11,6 +11,7 @@ mod llm;
 mod playback;
 mod state;
 mod stt;
+mod tools;
 mod tts;
 mod wake;
 
@@ -44,8 +45,31 @@ use crate::{
     playback::AudioPlayer,
     state::{RenState, SharedStateMachine},
     stt::{whisper::WhisperEngine, SttEngine},
+    tools::ToolRegistry,
     tts::{kokoro::KokoroEngine, TtsEngine},
 };
+
+fn build_tool_registry(config: &config::AppConfig) -> Arc<ToolRegistry> {
+    use crate::tools::apps::AppLauncher;
+    use crate::tools::files::OpenFolder;
+    use crate::tools::steam::SteamLauncher;
+    use crate::tools::system::{LockScreen, RestartSystem, ShutdownSystem, VolumeControl};
+    use crate::tools::web::{default_client as web_client, Weather, WebSearch};
+
+    let http = web_client();
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(VolumeControl));
+    registry.register(Arc::new(LockScreen));
+    registry.register(Arc::new(ShutdownSystem));
+    registry.register(Arc::new(RestartSystem));
+    registry.register(Arc::new(AppLauncher::new()));
+    registry.register(Arc::new(SteamLauncher::new()));
+    registry.register(Arc::new(OpenFolder));
+    registry.register(Arc::new(Weather::new(http.clone(), config)));
+    registry.register(Arc::new(WebSearch::new(http, config)));
+    info!("Registered {} tools", registry.len());
+    Arc::new(registry)
+}
 
 #[derive(Clone, serde::Serialize)]
 struct TranscriptPayload {
@@ -76,6 +100,8 @@ pub fn run() {
 
             let state_machine = state::new_shared(app_handle.clone());
             app.manage(state_machine.clone());
+
+            let tool_registry = build_tool_registry(&config);
 
             setup_tray(app)?;
             position_window_bottom_right(&app_handle)?;
@@ -151,7 +177,10 @@ pub fn run() {
             // Main event loop
             let sm = state_machine.clone();
             let handle = app_handle.clone();
-            let conversation: SharedConversation = Arc::new(AsyncMutex::new(Conversation::new()));
+            let conversation: SharedConversation = Arc::new(AsyncMutex::new(
+                Conversation::new(Some(tool_registry.as_ref())),
+            ));
+            let registry_for_loop = tool_registry.clone();
             tokio::spawn(async move {
                 event_loop(
                     handle,
@@ -162,6 +191,7 @@ pub fn run() {
                     sentence_tx,
                     llm_token_tx,
                     conversation,
+                    registry_for_loop,
                 )
                 .await;
             });
@@ -280,6 +310,7 @@ async fn event_loop(
     sentence_tx: mpsc::Sender<String>,
     llm_token_tx: mpsc::Sender<String>,
     conversation: SharedConversation,
+    registry: Arc<ToolRegistry>,
 ) {
     let mut push_to_talk_active = false;
 
@@ -288,7 +319,7 @@ async fn event_loop(
             Some(vad_event) = vad_rx.recv() => {
                 handle_vad_event(
                     &app, &sm, vad_event, &whisper,
-                    &sentence_tx, &llm_token_tx, &conversation,
+                    &sentence_tx, &llm_token_tx, &conversation, &registry,
                 )
                 .await;
             }
@@ -311,6 +342,7 @@ async fn handle_vad_event(
     sentence_tx: &mpsc::Sender<String>,
     llm_token_tx: &mpsc::Sender<String>,
     conversation: &SharedConversation,
+    registry: &Arc<ToolRegistry>,
 ) {
     match event {
         VadEvent::SpeechStart => {
@@ -323,8 +355,11 @@ async fn handle_vad_event(
             let current = sm.lock().unwrap().current();
             if current == RenState::Listening {
                 sm.lock().unwrap().transition(RenState::Thinking).ok();
-                run_full_turn(app, sm, &audio, whisper, sentence_tx, llm_token_tx, conversation)
-                    .await;
+                run_full_turn(
+                    app, sm, &audio, whisper,
+                    sentence_tx, llm_token_tx, conversation, registry,
+                )
+                .await;
             }
         }
     }
@@ -370,6 +405,7 @@ async fn run_full_turn(
     sentence_tx: &mpsc::Sender<String>,
     llm_token_tx: &mpsc::Sender<String>,
     conversation: &SharedConversation,
+    registry: &Arc<ToolRegistry>,
 ) {
     // 1. STT
     let transcript = match run_stt(sm, audio, whisper).await {
@@ -404,11 +440,15 @@ async fn run_full_turn(
     let llm_token_tx = llm_token_tx.clone();
     let conv = conversation.clone();
     let sm_clone = sm.clone();
+    let registry = registry.clone();
+    let app_clone = app.clone();
 
     tokio::spawn(async move {
         let mut conv = conv.lock().await;
         let result = llm::run_turn(
+            &app_clone,
             &client,
+            registry,
             &mut conv,
             &transcript,
             &llm_token_tx,

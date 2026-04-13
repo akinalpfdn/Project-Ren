@@ -48,5 +48,24 @@
   },
   "debug": {
     "state_controls_label": "Debug state transitions"
+  },
+  "tools": {
+    "status": {
+      "running": "Running",
+      "success": "Done",
+      "failure": "Failed"
+    },
+    "names": {
+      "system.volume": "System volume",
+      "system.lock": "Lock screen",
+      "system.shutdown": "Shut down",
+      "system.restart": "Restart",
+      "apps.launch": "Launch app",
+      "steam.launch": "Launch Steam game",
+      "files.open_folder": "Open folder",
+      "web.weather": "Weather",
+      "web.search": "Web search"
+    },
+    "fallback_name": "Tool"
   }
 }

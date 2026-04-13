@@ -45,3 +45,23 @@ export interface ErrorPayload {
 export interface WaveformPayload {
   amplitudes: number[];
 }
+
+export interface ToolExecutingPayload {
+  tool: string;
+  description: string;
+}
+
+export interface ToolResultPayload {
+  tool: string;
+  success: boolean;
+  summary: string;
+}
+
+export type ToolActivityStatus = 'running' | 'success' | 'failure';
+
+export interface ToolActivity {
+  tool: string;
+  status: ToolActivityStatus;
+  message: string;
+  startedAt: number;
+}

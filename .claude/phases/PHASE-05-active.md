@@ -1,5 +1,5 @@
 # Phase 05 — Tool System and First Tool Categories
-Status: PENDING (depends on Phase 4)
+Status: ACTIVE
 
 ## Goal
 Ren can take real actions on the system. Application launching, Steam games, system controls, folder opening, and web search all work via LLM tool calls.

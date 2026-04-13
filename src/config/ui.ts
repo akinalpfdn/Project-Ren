@@ -9,3 +9,6 @@ export const WAVEFORM_BAR_COUNT = 8;
 
 /** How long a finalized transcript stays on screen before auto-clearing. */
 export const TRANSCRIPT_VISIBLE_MS = 8_000;
+
+/** How long a tool activity card stays on screen after completion. */
+export const TOOL_CARD_VISIBLE_MS = 6_000;

@@ -186,6 +186,9 @@
   --ren-transcript-max-width: 260px;
   --ren-download-bar-width: 220px;
   --ren-download-bar-height: 2px;
+  --ren-tool-card-width: 280px;
+  --ren-tool-card-padding: var(--ren-space-3) var(--ren-space-4);
+  --ren-tool-card-indicator: 6px;
 
   /* ====== Motion ====== */
 

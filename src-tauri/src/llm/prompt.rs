@@ -1,7 +1,27 @@
+use crate::tools::{ToolRegistry, ToolSafety};
+
 /// Builds the system prompt injected at the start of every conversation.
-/// Tool schemas are appended here in Phase 5 when the ToolRegistry is ready.
-pub fn build_system_prompt() -> String {
-    SYSTEM_PROMPT_BASE.trim().to_string()
+/// When a `ToolRegistry` is provided, the list of available tools is
+/// appended so the LLM knows which names it may call and which ones
+/// require a spoken confirmation.
+pub fn build_system_prompt(registry: Option<&ToolRegistry>) -> String {
+    let mut prompt = SYSTEM_PROMPT_BASE.trim().to_string();
+
+    if let Some(reg) = registry {
+        let safety = reg.safety_map();
+        if !safety.is_empty() {
+            prompt.push_str("\n\nAvailable tools:");
+            for (name, s) in &safety {
+                let tag = match s {
+                    ToolSafety::Safe => "safe",
+                    ToolSafety::Destructive => "destructive — confirm before calling",
+                };
+                prompt.push_str(&format!("\n- {} ({})", name, tag));
+            }
+        }
+    }
+
+    prompt
 }
 
 const SYSTEM_PROMPT_BASE: &str = r#"

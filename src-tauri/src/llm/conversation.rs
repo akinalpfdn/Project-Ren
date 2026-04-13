@@ -1,4 +1,5 @@
 use crate::llm::{client::Message, prompt::build_system_prompt};
+use crate::tools::ToolRegistry;
 
 /// In-memory conversation history for the current session.
 /// Resets on Ren restart. The system prompt is always at index 0.
@@ -7,9 +8,11 @@ pub struct Conversation {
 }
 
 impl Conversation {
-    pub fn new() -> Self {
+    /// Build a fresh conversation. Pass `Some(registry)` to inject the
+    /// available-tools block into the system prompt.
+    pub fn new(registry: Option<&ToolRegistry>) -> Self {
         Self {
-            messages: vec![Message::system(build_system_prompt())],
+            messages: vec![Message::system(build_system_prompt(registry))],
         }
     }
 
