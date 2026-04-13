@@ -41,3 +41,7 @@ export interface ErrorPayload {
   code: string;
   message: string;
 }
+
+export interface WaveformPayload {
+  amplitudes: number[];
+}

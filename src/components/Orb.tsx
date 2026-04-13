@@ -1,6 +1,7 @@
 /**
  * Orb Component
- * Core visual element that animates based on Ren's state
+ * Core visual element that animates based on Ren's state.
+ * Speaking state uses real waveform data from the TTS playback.
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,7 +9,8 @@ import { useRenStore } from '../store';
 import styles from './Orb.module.css';
 
 export const Orb = () => {
-  const currentState = useRenStore((state) => state.currentState);
+  const currentState = useRenStore((s) => s.currentState);
+  const waveformAmplitudes = useRenStore((s) => s.waveformAmplitudes);
 
   const renderStateVisual = () => {
     switch (currentState) {
@@ -25,8 +27,15 @@ export const Orb = () => {
       case 'speaking':
         return (
           <div className={styles.waveform}>
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className={styles.waveBar} />
+            {waveformAmplitudes.map((amp, i) => (
+              <div
+                key={i}
+                className={styles.waveBar}
+                style={{
+                  // Data-driven height: 15% minimum, up to 100%
+                  transform: `scaleY(${Math.max(0.15, amp)})`,
+                }}
+              />
             ))}
           </div>
         );
@@ -42,10 +51,7 @@ export const Orb = () => {
         className={`${styles.orb} ${styles[currentState]}`}
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{
-          duration: 0.5,
-          ease: 'easeOut',
-        }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
       >
         <AnimatePresence mode="wait">{renderStateVisual()}</AnimatePresence>
       </motion.div>

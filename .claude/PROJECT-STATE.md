@@ -2,14 +2,14 @@
 Last updated: 2026-04-13
 
 ## Active Phase
-**Phase 2** — Audio Pipeline Foundation (code complete, needs home testing)
+**Phase 3** — LLM + TTS (code complete, needs home testing)
 
 ## Phase Files
 | File | Status |
 |------|--------|
 | `.claude/phases/PHASE-01-complete.md` | COMPLETE |
-| `.claude/phases/PHASE-02-active.md` | ACTIVE ← you are here |
-| `.claude/phases/PHASE-03.md` | PENDING |
+| `.claude/phases/PHASE-02-active.md` | ACTIVE (code done, home test pending) |
+| `.claude/phases/PHASE-03.md` | ACTIVE ← you are here |
 | `.claude/phases/PHASE-04.md` | PENDING |
 | `.claude/phases/PHASE-05.md` | PENDING |
 | `.claude/phases/PHASE-06.md` | PENDING |
@@ -63,11 +63,20 @@ Last updated: 2026-04-13
 - `cargo check` (no features) → will compile on work machine once deps download
 - `cargo check --features stt` → needs C++ toolchain + CMake → test at home
 
-## What Phase 2 Still Needs (home)
-See `PHASE-02-active.md` → "Eve Gidince Yapılacaklar" section.
-Short version: `cargo check --features stt`, download Whisper model, update SHA256 hash, full PTT test.
+## What's Needed at Home (phases 2 & 3)
+- **Phase 2**: `cargo check --features stt`, download Whisper model, update SHA256 in defaults.rs, full PTT test
+- **Phase 3**: Download Ollama binary + Kokoro ONNX, implement `KokoroEngine::synthesize()` ORT inference, full voice loop test
 
-## What Phase 3 Starts With
-After Phase 2 home test passes:
-Add Ollama child process manager, LLM HTTP client, Kokoro TTS engine.
-See `PHASE-03.md`.
+## Rust Backend — New in Phase 3
+- `llm/ollama_process.rs` — child process + Windows Job Object + port probing
+- `llm/client.rs` — OllamaClient with SSE streaming
+- `llm/prompt.rs` — JARVIS system prompt
+- `llm/conversation.rs` — per-session history
+- `llm/mod.rs` — `run_turn()` + sentence boundary splitter
+- `tts/mod.rs` — TtsEngine trait
+- `tts/kokoro.rs` — KokoroEngine (feature-gated, ORT inference TODO for home)
+- `playback/mod.rs` — AudioPlayer (rodio), waveform RMS computation
+
+## What Phase 4 Starts With
+Wake word (Porcupine), proper state machine overhaul, remove StateControls debug UI.
+See `PHASE-04.md`.

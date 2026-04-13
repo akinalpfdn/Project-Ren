@@ -62,6 +62,19 @@ futures             = "0.3"
 # Async trait support
 async-trait         = "0.1"
 
+# Audio playback (TTS output)
+rodio               = "0.19"
+
+# ONNX Runtime (Kokoro TTS)
+# Optional: only links native ORT when "tts" feature is enabled.
+ort                 = { version = "2", optional = true }
+
+# ndarray for audio tensor manipulation
+ndarray             = { version = "0.16", optional = true }
+
+# Sentence splitting for streaming TTS pipeline
+unicode-segmentation = "1"
+
 # Windows-specific native APIs
 [target.'cfg(windows)'.dependencies]
 windows             = { version = "0.61", features = [
@@ -78,3 +91,5 @@ windows             = { version = "0.61", features = [
 default = []
 # Enable real Whisper STT — requires whisper.cpp native build (C++ toolchain + CMake).
 stt = ["whisper-rs"]
+# Enable real Kokoro TTS — requires ONNX Runtime native library.
+tts = ["ort", "ndarray"]

@@ -1,7 +1,7 @@
 /**
  * useRenEvents
  * Subscribes to all Tauri backend events and syncs them into the Zustand store.
- * Call once at the app root — it mounts/unmounts listeners with the component.
+ * Call once at the app root.
  */
 
 import { useEffect } from 'react';
@@ -12,10 +12,11 @@ import type {
   TranscriptPayload,
   DownloadProgressPayload,
   ErrorPayload,
+  WaveformPayload,
 } from '../types';
 
 export const useRenEvents = () => {
-  const { setState, setError, setTranscript, setDownloadProgress } =
+  const { setState, setError, setTranscript, setDownloadProgress, setWaveform } =
     useRenStore();
 
   useEffect(() => {
@@ -62,6 +63,12 @@ export const useRenEvents = () => {
           });
         })
       );
+
+      unlisten.push(
+        await listen<WaveformPayload>('ren://waveform', (event) => {
+          setWaveform(event.payload.amplitudes);
+        })
+      );
     };
 
     setup();
@@ -69,5 +76,5 @@ export const useRenEvents = () => {
     return () => {
       unlisten.forEach((fn) => fn());
     };
-  }, [setState, setError, setTranscript, setDownloadProgress]);
+  }, [setState, setError, setTranscript, setDownloadProgress, setWaveform]);
 };

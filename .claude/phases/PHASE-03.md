@@ -1,104 +1,105 @@
 # Phase 03 — Local LLM via Portable Ollama, and TTS
-Status: PENDING (depends on Phase 2)
+Status: ACTIVE (code complete, needs home testing)
 
 ## Goal
 Ren understands transcribed speech, generates English responses via a private Ollama child process running Qwen 2.5 14B, and speaks them out loud via Kokoro TTS.
 
-## Context From Phase 2
-- By end of Phase 2, Turkish transcript arrives via `ren://transcript` event with `isFinal: true`.
-- State machine handles: idle → listening → thinking → idle. In Phase 3, "thinking" expands to: STT complete → LLM inference → TTS synthesis → speaking → idle.
-- The `stt/mod.rs` STT trait established in Phase 2 should be followed as a model for the LLM and TTS traits.
+---
 
-## Tasks
+## ✅ Done (work computer — no model/runtime needed)
 
-### Ollama Child Process Manager
-- [ ] Download manager for `ollama.exe`: detect if `%APPDATA%\Ren\bin\ollama.exe` exists; if not, download from pinned GitHub release URL, SHA256 verify
-- [ ] `OllamaProcess` struct in `src-tauri/src/llm/ollama_process.rs`: spawns `ollama serve` as child process with:
-  - `OLLAMA_MODELS` env var → `%APPDATA%\Ren\models\ollama\`
-  - `OLLAMA_HOST` env var → `127.0.0.1:<selected_port>`
-- [ ] Port selection: try port 11500 → if occupied, probe 11501–11520 → store chosen port in session config
-- [ ] Windows Job Object: bind child process to parent so OS kills child if Ren crashes (prevents orphaned `ollama.exe` in Task Manager)
-- [ ] Health check loop: poll `GET /api/tags` every 500ms until 200 OK or 30s timeout
-- [ ] Process lifecycle: clean shutdown on `AppExit` event; if Ren crashes, Job Object handles it
-- [ ] Pre-run: `ollama pull qwen2.5:14b` via child's HTTP API, stream download progress to `ren://download-progress`
-
-### LLM HTTP Client
-- [ ] `OllamaClient` struct in `src-tauri/src/llm/client.rs`: wraps `reqwest`, targets `http://127.0.0.1:<port>`
-- [ ] `chat()` method: POST `/api/chat`, streaming response via SSE, returns `impl Stream<Item = String>`
-- [ ] Conversation history: `Vec<Message>` maintained in memory per session, passed with each request
-- [ ] System prompt: defined in `src-tauri/src/llm/prompt.rs` — JARVIS personality, calm and dry, addresses user as "sir" occasionally, Turkish input → English output, tool schemas appended in Phase 5
-
-### TTS Engine
-- [ ] Kokoro ONNX model download: `%APPDATA%\Ren\models\kokoro\kokoro.onnx` (~300MB from HuggingFace `onnx-community/Kokoro-82M-v1.0-ONNX`)
-- [ ] `KokoroEngine` in `src-tauri/src/tts/kokoro.rs`: wraps `ort` (ONNX Runtime), default voice `bf_emma`
-- [ ] `TtsTrait` in `src-tauri/src/tts/mod.rs` — abstracted so voice engine can be swapped later (e.g. for Turkish TTS or Piper)
-- [ ] Audio playback: `rodio` for speaker output
-- [ ] Waveform data: emit audio amplitude chunks via `ren://waveform` for speaking animation
-
-### Streaming Pipeline
-- [ ] Sentence-level chunking: as LLM tokens arrive, buffer until sentence boundary (`.`, `?`, `!`), send chunk to TTS immediately — minimizes time-to-first-audio
-- [ ] Pipeline: transcript → LLM stream → sentence splitter → TTS → playback + waveform events
+### Rust Backend
+| File | What it does |
+|------|-------------|
+| `src-tauri/Cargo.toml` | Added: `rodio`, `ort` (optional/`tts` feature), `ndarray` (optional), `unicode-segmentation`. New feature flag: `tts = ["ort", "ndarray"]` |
+| `src-tauri/src/llm/ollama_process.rs` | `start()` — spawns `ollama serve` as child process. Port probing (11500–11520). `OLLAMA_MODELS` env override. Windows Job Object via `windows-rs` so child dies with parent. `health_check()` polls `/api/tags`. `terminate()` for clean shutdown. `ollama_exe_path()`, `ollama_download_url()` helpers |
+| `src-tauri/src/llm/client.rs` | `OllamaClient` — `chat_stream()` POST `/api/chat` with SSE streaming. Parses token deltas and tool calls from JSON chunks. `ping()` for keep-alive. `Message` struct with system/user/assistant/tool_result constructors |
+| `src-tauri/src/llm/prompt.rs` | `build_system_prompt()` — JARVIS personality, Turkish→English rule, no filler phrases, tool use guidance. Inline `const SYSTEM_PROMPT_BASE` |
+| `src-tauri/src/llm/conversation.rs` | `Conversation` — Vec<Message> with system prompt at [0]. `push_user`, `push_assistant`, `push_tool_result`, `reset()`, `messages()` |
+| `src-tauri/src/llm/mod.rs` | `run_turn()` — drives full LLM turn: appends user msg, streams tokens, splits on sentence boundaries, sends to `sentence_tx`. `find_sentence_boundary()`. `default_client()` |
+| `src-tauri/src/tts/mod.rs` | `TtsEngine` trait: `synthesize(&str)`, `load()`, `unload()`, `is_loaded()`, `sample_rate()` |
+| `src-tauri/src/tts/kokoro.rs` | `KokoroEngine` — feature-gated on `tts`. `load()` → ORT Session from `%APPDATA%\Ren\models\kokoro\kokoro.onnx`. `synthesize()` stub with TODO comment for ORT inference (complete at home). `sample_rate()` = 24000 |
+| `src-tauri/src/playback/mod.rs` | `AudioPlayer` — rodio `OutputStream` + `Sink`. `play()` takes `AudioBuffer` + `sample_rate`, emits `ren://waveform` with 8-bar RMS amplitudes before/after playback. `compute_waveform()` |
+| `src-tauri/src/lib.rs` | Full Phase 3 wiring: `sentence_tx/rx` channel, Ollama start (non-fatal if missing), `tts_sentence_loop` task (lazy Kokoro load → Speaking state → playback → Idle), `run_full_turn` (STT → transcript event → LLM if Ollama running → sentence stream) |
 
 ### Frontend
-- [ ] Speaking state: Orb's waveform animation driven by real `ren://waveform` amplitude data (replace CSS keyframe with data-driven bars)
-- [ ] Remove placeholder transcript display from Phase 2 if it's just debug; keep if it looks good
-- [ ] Handle `ren://waveform` event in store/listener
+| File | What it does |
+|------|-------------|
+| `src/types/index.ts` | Added `WaveformPayload { amplitudes: number[] }` |
+| `src/store/index.ts` | Added `waveformAmplitudes: number[]` field + `setWaveform()` action |
+| `src/hooks/useRenEvents.ts` | Added `ren://waveform` listener → `setWaveform()` |
+| `src/components/Orb.tsx` | Speaking state now uses real `waveformAmplitudes` from store. Each bar's `scaleY` = `max(0.15, amplitude)` — data-driven instead of CSS keyframe |
 
-## Architecture Notes
+**Frontend build: ✅ passes clean**
 
-### Crate Structure Additions
+---
+
+## 🏠 Eve Gidince Yapılacaklar
+
+### 1. Ollama binary'yi indir
 ```
-src-tauri/src/
-  llm/
-    mod.rs              — LlmTrait definition
-    client.rs           — OllamaClient (reqwest HTTP wrapper)
-    ollama_process.rs   — OllamaProcess (child process manager)
-    prompt.rs           — System prompt builder
-  tts/
-    mod.rs              — TtsTrait definition
-    kokoro.rs           — KokoroEngine (ort/ONNX)
-  config/
-    mod.rs              — AppConfig struct (reads/writes %APPDATA%\Ren\config.json)
-    defaults.rs         — All default values as constants
-```
-
-### Config Defaults (establish here, use throughout)
-- Ollama preferred port: `11500`
-- Ollama port probe range: `11500–11520`
-- Ollama keep_alive: `"30m"`
-- Ollama model: `"qwen2.5:14b"`
-- Default TTS voice: `"bf_emma"`
-- Conversation idle timeout: `30` seconds (used in Phase 4)
-
-### System Prompt Skeleton
-```
-You are Ren, a calm, dry, highly capable personal AI assistant running entirely on the user's machine.
-You respond in English only, even when spoken to in Turkish.
-Your personality is inspired by JARVIS: efficient, composed, occasionally dry humor, address the user as "sir" when appropriate.
-Responses are concise — never verbose unless the user asks for detail.
-You have access to tools. When a user request maps to a tool, call it directly without asking for confirmation unless the action is destructive.
+# Otomatik indirme Phase 7'de first-run wizard'a eklenecek.
+# Şimdilik manual:
+# URL: https://github.com/ollama/ollama/releases/download/v0.9.0/ollama-windows-amd64.exe
+# Koy: %APPDATA%\Ren\bin\ollama.exe
 ```
 
-### New Tauri Events
-- `ren://waveform` — payload: `{ amplitudes: number[] }` (array of 8 bar heights, 0.0–1.0)
-- `ren://llm-token` — payload: `{ token: string }` (optional, for showing live typing)
+### 2. Ollama child process test
+```bash
+npm run tauri dev
+# Konsolda "Ollama ready on port 11500" görünmeli
+# Task Manager'da ollama.exe görünmeli
+# Ren kapatınca ollama.exe da kapanmalı (Job Object test)
+```
 
-## Acceptance Criteria
-- [ ] Ren downloads Ollama binary and Qwen 14B on first launch with progress UI
-- [ ] Ollama child process starts on a custom port and survives until Ren exits
-- [ ] Ren responds to Turkish speech with English speech
-- [ ] Personality is consistent across turns
-- [ ] Time-to-first-audio under 2 seconds on target hardware after warm-up
-- [ ] Conversation history works for follow-up questions within a session
-- [ ] Killing Ren cleanly terminates the child Ollama process — no orphans in Task Manager
-- [ ] Pre-existing system Ollama (if user has one) does not interfere with Ren's instance
-- [ ] Downloads are resumable if interrupted
+### 3. Qwen 14B pull et
+```bash
+# Ren'in private Ollama'sı çalışırken:
+%APPDATA%\Ren\bin\ollama.exe pull qwen2.5:14b
+# Ya da Ren başlarken otomatik pull — Phase 7'de first-run wizard halleder
+```
 
-## Decisions Made This Phase
-<!-- Append here as they happen -->
+### 4. LLM turu test
+- Ctrl+Alt+R → Türkçe konuş → transcript → Ollama cevap vermeli
+- Cevap `sentence_tx` üzerinden akmalı, konsol loglarında token'lar görünmeli
+- State: Thinking → (Speaking — Kokoro hazır olunca)
 
-## Known Risks
-- Qwen 14B + Whisper large-v3 together may push 12GB VRAM limit. Monitor real usage; fall back to Whisper medium if OOM.
-- Kokoro is English-only TTS — Turkish TTS output not supported. TtsTrait abstraction ensures this can be swapped later.
-- Windows Job Object for child process requires careful handle management — test crash scenarios explicitly.
-- Ollama binary version must be pinned — define pinned version constant in `config/defaults.rs`.
+### 5. Kokoro ONNX modelini indir
+```
+# Kaynak: https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX
+# Dosya: kokoro.onnx (~300MB)
+# Koy: %APPDATA%\Ren\models\kokoro\kokoro.onnx
+```
+
+### 6. ORT inference'ı tamamla (tts/kokoro.rs)
+Mevcut `synthesize()` fonksiyonundaki TODO'yu doldur:
+- Kokoro tokenizer: https://github.com/thewh1teagle/kokoro-onnx için referans Rust impl bak
+- Input tensors: `input_ids` (phoneme IDs), `style` (voice embedding for `bf_emma`), `speed` (1.0)
+- Output: audio samples → `AudioBuffer`
+
+### 7. Ses testi
+```bash
+cd src-tauri
+cargo build --features stt,tts
+# Full pipeline: Türkçe konuş → İngilizce cevap gelmeli
+```
+
+### 8. Orphan process test
+- Ren'i task manager'dan zorla kapat
+- `ollama.exe`'nin de kapandığını doğrula (Job Object çalışıyor mu?)
+
+### 9. Port conflict test
+- Port 11500'ü başka bir şeyle meşgul et, Ren'in 11501'e geçtiğini doğrula
+
+---
+
+## Acceptance Criteria Durumu
+- [ ] Ren downloads Ollama binary — **Phase 7 first-run wizard**
+- [ ] Ollama child starts on custom port — **✅ Rust kodu tamam, eve test**
+- [ ] Ren responds to Turkish speech with English speech — **eve test (Kokoro synthesize TODO)**
+- [ ] Personality consistent — **✅ system prompt yazıldı**
+- [ ] Time-to-first-audio under 2s — **eve ölç**
+- [ ] Conversation history works — **✅ Conversation struct**
+- [ ] Killing Ren terminates Ollama — **✅ Job Object kodu tamam, eve test**
+- [ ] Pre-existing system Ollama doesn't interfere — **✅ port isolation + OLLAMA_MODELS override**
+- [ ] Downloads resumable — **Phase 7**

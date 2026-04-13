@@ -1,8 +1,3 @@
-/**
- * Zustand Store
- * Mock state machine for Phase 1 - real state machine will be in Rust backend
- */
-
 import { create } from 'zustand';
 import type { RenState, ErrorState } from '../types';
 
@@ -19,6 +14,7 @@ interface RenStore {
   isVisible: boolean;
   transcript: string | null;
   downloadProgress: DownloadProgress | null;
+  waveformAmplitudes: number[];
 
   setState: (state: RenState) => void;
   setError: (error: ErrorState | null) => void;
@@ -26,6 +22,7 @@ interface RenStore {
   setVisibility: (visible: boolean) => void;
   setTranscript: (text: string | null) => void;
   setDownloadProgress: (progress: DownloadProgress | null) => void;
+  setWaveform: (amplitudes: number[]) => void;
 }
 
 export const useRenStore = create<RenStore>((set) => ({
@@ -34,6 +31,7 @@ export const useRenStore = create<RenStore>((set) => ({
   isVisible: true,
   transcript: null,
   downloadProgress: null,
+  waveformAmplitudes: Array(8).fill(0),
 
   setState: (state) => set({ currentState: state, error: null }),
 
@@ -47,4 +45,6 @@ export const useRenStore = create<RenStore>((set) => ({
   setTranscript: (text) => set({ transcript: text }),
 
   setDownloadProgress: (progress) => set({ downloadProgress: progress }),
+
+  setWaveform: (amplitudes) => set({ waveformAmplitudes: amplitudes }),
 }));
