@@ -34,6 +34,19 @@
   "welcome": {
     "title": "Welcome to Ren",
     "subtitle": "Your local AI assistant",
-    "initializing": "Initializing systems..."
+    "initializing": "Initializing systems"
+  },
+  "download": {
+    "steps": {
+      "whisper": "Downloading speech recognition model",
+      "ollama": "Downloading language runtime",
+      "qwen": "Downloading language model",
+      "kokoro": "Downloading voice model",
+      "porcupine": "Downloading wake word model"
+    },
+    "unknown_step": "Preparing"
+  },
+  "debug": {
+    "state_controls_label": "Debug state transitions"
   }
 }

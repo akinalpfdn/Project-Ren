@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { RenState, ErrorState } from '../types';
+import { WAVEFORM_BAR_COUNT } from '../config/ui';
 
 export interface DownloadProgress {
   step: string;
@@ -31,7 +32,7 @@ export const useRenStore = create<RenStore>((set) => ({
   isVisible: true,
   transcript: null,
   downloadProgress: null,
-  waveformAmplitudes: Array(8).fill(0),
+  waveformAmplitudes: Array<number>(WAVEFORM_BAR_COUNT).fill(0),
 
   setState: (state) => set({ currentState: state, error: null }),
 

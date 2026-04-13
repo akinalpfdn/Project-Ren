@@ -4,6 +4,7 @@
 mod audio;
 mod commands;
 mod config;
+mod dismissal;
 mod download;
 mod hotkey;
 mod llm;
@@ -11,16 +12,29 @@ mod playback;
 mod state;
 mod stt;
 mod tts;
+mod wake;
 
 use std::process::Child;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex as AsyncMutex};
+use tokio::time::{sleep, Instant};
+
+/// Conversation is held across `.await` points during LLM streaming,
+/// so it must use an async-aware mutex.
+type SharedConversation = Arc<AsyncMutex<Conversation>>;
+
+/// Whisper and Kokoro engines are driven from async tasks (load + transcribe
+/// / synthesize are all async). Using `tokio::sync::Mutex` ensures the guard
+/// is `Send` and can be held across `.await` safely.
+type SharedWhisper = Arc<AsyncMutex<WhisperEngine>>;
+type SharedKokoro = Arc<AsyncMutex<KokoroEngine>>;
 use tracing::{info, warn};
 
 use crate::{
@@ -29,8 +43,8 @@ use crate::{
     llm::{conversation::Conversation, default_client},
     playback::AudioPlayer,
     state::{RenState, SharedStateMachine},
-    stt::whisper::WhisperEngine,
-    tts::kokoro::KokoroEngine,
+    stt::{whisper::WhisperEngine, SttEngine},
+    tts::{kokoro::KokoroEngine, TtsEngine},
 };
 
 #[derive(Clone, serde::Serialize)]
@@ -80,8 +94,8 @@ pub fn run() {
                 .expect("Failed to register hotkeys");
 
             // Engines (lazily loaded)
-            let whisper = Arc::new(Mutex::new(WhisperEngine::new()));
-            let kokoro = Arc::new(Mutex::new(KokoroEngine::new(
+            let whisper: SharedWhisper = Arc::new(AsyncMutex::new(WhisperEngine::new()));
+            let kokoro: SharedKokoro = Arc::new(AsyncMutex::new(KokoroEngine::new(
                 Some(config.tts_voice.as_str()),
             )));
 
@@ -93,7 +107,6 @@ pub fn run() {
             // Ollama child process (started async after setup)
             let ollama_child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
             let ollama_child_clone = ollama_child.clone();
-            let sm_for_ollama = state_machine.clone();
             tokio::spawn(async move {
                 match llm::ollama_process::start().await {
                     Ok(child) => {
@@ -102,7 +115,6 @@ pub fn run() {
                     }
                     Err(e) => {
                         warn!("Ollama not started: {} — LLM responses disabled", e);
-                        // Not a fatal error during dev — STT still works without Ollama
                     }
                 }
             });
@@ -123,10 +135,23 @@ pub fn run() {
                 .await;
             });
 
+            // Conversation idle timer — Idle → Sleeping after configured timeout.
+            spawn_conversation_timer(
+                state_machine.clone(),
+                Duration::from_secs(config.conversation_timeout_secs),
+            );
+
+            // Model lifecycle observer — unload heavy engines when entering Sleeping.
+            spawn_model_unloader(
+                state_machine.clone(),
+                whisper.clone(),
+                kokoro.clone(),
+            );
+
             // Main event loop
             let sm = state_machine.clone();
             let handle = app_handle.clone();
-            let conversation = Arc::new(Mutex::new(Conversation::new()));
+            let conversation: SharedConversation = Arc::new(AsyncMutex::new(Conversation::new()));
             tokio::spawn(async move {
                 event_loop(
                     handle,
@@ -148,15 +173,17 @@ pub fn run() {
                 .transition(RenState::Sleeping)
                 .unwrap_or_else(|e| warn!("Init transition failed: {}", e));
 
-            // Clean up Ollama on app exit
-            let ollama_on_exit = ollama_child.clone();
-            app.on_window_event(move |_, event| {
-                if matches!(event, tauri::WindowEvent::Destroyed) {
-                    if let Some(child) = ollama_on_exit.lock().unwrap().as_mut() {
-                        llm::ollama_process::terminate(child);
+            // Clean up Ollama on app exit (attach to main window)
+            if let Some(window) = app.get_webview_window("main") {
+                let ollama_on_exit = ollama_child.clone();
+                window.on_window_event(move |event| {
+                    if matches!(event, tauri::WindowEvent::Destroyed) {
+                        if let Some(child) = ollama_on_exit.lock().unwrap().as_mut() {
+                            llm::ollama_process::terminate(child);
+                        }
                     }
-                }
-            });
+                });
+            }
 
             info!("Ren initialized");
             Ok(())
@@ -171,6 +198,77 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
+// ─── State observers ─────────────────────────────────────────────────────────
+
+/// Conversation mode: while in Idle, await follow-up. After `timeout` of
+/// continuous Idle, automatically force-sleep so heavy models can be unloaded.
+/// Any transition out of Idle cancels the pending sleep.
+fn spawn_conversation_timer(sm: SharedStateMachine, timeout: Duration) {
+    let mut rx = sm.lock().unwrap().subscribe();
+    tokio::spawn(async move {
+        let mut idle_since: Option<Instant> = None;
+
+        loop {
+            // Compute how long to wait until either a state change arrives or
+            // the idle deadline expires.
+            let wait = match idle_since {
+                Some(start) => timeout
+                    .checked_sub(start.elapsed())
+                    .unwrap_or(Duration::from_millis(0)),
+                None => Duration::from_secs(60 * 60), // effectively "until next event"
+            };
+
+            tokio::select! {
+                changed = rx.recv() => match changed {
+                    Ok(RenState::Idle) => idle_since = Some(Instant::now()),
+                    Ok(_) => idle_since = None,
+                    Err(_) => return, // channel closed → app shutting down
+                },
+                _ = sleep(wait), if idle_since.is_some() => {
+                    if let Some(start) = idle_since {
+                        if start.elapsed() >= timeout {
+                            info!("Conversation idle timeout — returning to Sleeping");
+                            sm.lock().unwrap().force(RenState::Sleeping);
+                            idle_since = None;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+/// On every Sleeping transition, drop the loaded STT and TTS models so they
+/// release VRAM. Models are reloaded lazily on the next wake.
+fn spawn_model_unloader(
+    sm: SharedStateMachine,
+    whisper: SharedWhisper,
+    kokoro: SharedKokoro,
+) {
+    let mut rx = sm.lock().unwrap().subscribe();
+    tokio::spawn(async move {
+        loop {
+            match rx.recv().await {
+                Ok(RenState::Sleeping) => {
+                    let mut w = whisper.lock().await;
+                    if w.is_loaded() {
+                        info!("Sleeping — unloading Whisper");
+                        w.unload();
+                    }
+                    drop(w);
+                    let mut k = kokoro.lock().await;
+                    if k.is_loaded() {
+                        info!("Sleeping — unloading Kokoro");
+                        k.unload();
+                    }
+                }
+                Ok(_) => {}
+                Err(_) => return,
+            }
+        }
+    });
+}
+
 // ─── Event loop ──────────────────────────────────────────────────────────────
 
 async fn event_loop(
@@ -178,10 +276,10 @@ async fn event_loop(
     sm: SharedStateMachine,
     mut vad_rx: mpsc::Receiver<VadEvent>,
     mut hotkey_rx: mpsc::Receiver<HotkeyEvent>,
-    whisper: Arc<Mutex<WhisperEngine>>,
+    whisper: SharedWhisper,
     sentence_tx: mpsc::Sender<String>,
     llm_token_tx: mpsc::Sender<String>,
-    conversation: Arc<Mutex<Conversation>>,
+    conversation: SharedConversation,
 ) {
     let mut push_to_talk_active = false;
 
@@ -209,10 +307,10 @@ async fn handle_vad_event(
     app: &AppHandle,
     sm: &SharedStateMachine,
     event: VadEvent,
-    whisper: &Arc<Mutex<WhisperEngine>>,
+    whisper: &SharedWhisper,
     sentence_tx: &mpsc::Sender<String>,
     llm_token_tx: &mpsc::Sender<String>,
-    conversation: &Arc<Mutex<Conversation>>,
+    conversation: &SharedConversation,
 ) {
     match event {
         VadEvent::SpeechStart => {
@@ -233,14 +331,14 @@ async fn handle_vad_event(
 }
 
 async fn handle_hotkey_event(
-    app: &AppHandle,
+    _app: &AppHandle,
     sm: &SharedStateMachine,
     event: HotkeyEvent,
     ptt_active: &mut bool,
-    whisper: &Arc<Mutex<WhisperEngine>>,
-    sentence_tx: &mpsc::Sender<String>,
-    llm_token_tx: &mpsc::Sender<String>,
-    conversation: &Arc<Mutex<Conversation>>,
+    _whisper: &SharedWhisper,
+    _sentence_tx: &mpsc::Sender<String>,
+    _llm_token_tx: &mpsc::Sender<String>,
+    _conversation: &SharedConversation,
 ) {
     match event {
         HotkeyEvent::PushToTalkStart => {
@@ -254,7 +352,7 @@ async fn handle_hotkey_event(
         }
         HotkeyEvent::PushToTalkEnd => {
             *ptt_active = false;
-            // VAD SpeechEnd drives the actual transcription trigger
+            // The actual transcription trigger comes from VAD SpeechEnd.
         }
         HotkeyEvent::ForceSleep => {
             sm.lock().unwrap().force(RenState::Sleeping);
@@ -268,22 +366,31 @@ async fn run_full_turn(
     app: &AppHandle,
     sm: &SharedStateMachine,
     audio: &[f32],
-    whisper: &Arc<Mutex<WhisperEngine>>,
+    whisper: &SharedWhisper,
     sentence_tx: &mpsc::Sender<String>,
     llm_token_tx: &mpsc::Sender<String>,
-    conversation: &Arc<Mutex<Conversation>>,
+    conversation: &SharedConversation,
 ) {
     // 1. STT
-    let transcript = match run_stt(app, sm, audio, whisper).await {
+    let transcript = match run_stt(sm, audio, whisper).await {
         Some(t) => t,
         None => return,
     };
 
-    // Emit transcript to frontend
     let _ = app.emit(
         "ren://transcript",
-        TranscriptPayload { text: transcript.clone(), is_final: true },
+        TranscriptPayload {
+            text: transcript.clone(),
+            is_final: true,
+        },
     );
+
+    // Voice dismissal — short-circuit straight to Sleeping.
+    if dismissal::is_dismissal(&transcript) {
+        info!("Dismissal phrase detected — returning to Sleeping");
+        sm.lock().unwrap().force(RenState::Sleeping);
+        return;
+    }
 
     // 2. LLM — only if Ollama is running
     if llm::ollama_process::active_port() == 0 {
@@ -297,58 +404,38 @@ async fn run_full_turn(
     let llm_token_tx = llm_token_tx.clone();
     let conv = conversation.clone();
     let sm_clone = sm.clone();
-    let app_clone = app.clone();
 
     tokio::spawn(async move {
-        let result = {
-            let mut conv = conv.lock().unwrap();
-            // We must drop the lock before awaiting — clone messages out
-            let user_text = transcript.clone();
-            drop(conv);
+        let mut conv = conv.lock().await;
+        let result = llm::run_turn(
+            &client,
+            &mut conv,
+            &transcript,
+            &llm_token_tx,
+            &sentence_tx,
+        )
+        .await;
 
-            let mut conv = conversation.lock().unwrap();
-            llm::run_turn(
-                &client,
-                &mut conv,
-                &user_text,
-                &llm_token_tx,
-                &sentence_tx,
-            )
-            .await
-        };
-
-        match result {
-            Ok(_) => {}
-            Err(e) => {
-                sm_clone
-                    .lock()
-                    .unwrap()
-                    .emit_error("llm_failed", &e.to_string());
-            }
+        if let Err(e) = result {
+            sm_clone
+                .lock()
+                .unwrap()
+                .emit_error("llm_failed", &e.to_string());
         }
     });
 }
 
 async fn run_stt(
-    app: &AppHandle,
     sm: &SharedStateMachine,
     audio: &[f32],
-    whisper: &Arc<Mutex<WhisperEngine>>,
+    whisper: &SharedWhisper,
 ) -> Option<String> {
     // Lazy load
     {
-        let mut engine = whisper.lock().unwrap();
-        if !engine.is_loaded() {
-            drop(engine);
-            let w = whisper.clone();
-            let load_result = tokio::task::spawn_blocking(move || {
-                tokio::runtime::Handle::current()
-                    .block_on(async { w.lock().unwrap().load().await })
-            })
-            .await
-            .unwrap_or_else(|e| Err(anyhow::anyhow!("{}", e)));
-
-            if let Err(e) = load_result {
+        let mut guard = whisper.lock().await;
+        if !guard.is_loaded() {
+            if let Err(e) = guard.load().await {
+                drop(guard);
                 sm.lock()
                     .unwrap()
                     .emit_error("model_load_failed", &e.to_string());
@@ -357,14 +444,10 @@ async fn run_stt(
         }
     }
 
-    let audio_owned = audio.to_vec();
-    let w = whisper.clone();
-    let result = tokio::task::spawn_blocking(move || {
-        tokio::runtime::Handle::current()
-            .block_on(async { w.lock().unwrap().transcribe(&audio_owned).await })
-    })
-    .await
-    .unwrap_or_else(|e| Err(anyhow::anyhow!("{}", e)));
+    let result = {
+        let mut guard = whisper.lock().await;
+        guard.transcribe(audio).await
+    };
 
     match result {
         Ok(text) if !text.trim().is_empty() => Some(text),
@@ -387,23 +470,16 @@ async fn tts_sentence_loop(
     app: AppHandle,
     sm: SharedStateMachine,
     mut sentence_rx: mpsc::Receiver<String>,
-    kokoro: Arc<Mutex<KokoroEngine>>,
+    kokoro: SharedKokoro,
     player: Arc<AudioPlayer>,
 ) {
     while let Some(sentence) = sentence_rx.recv().await {
         // Lazy load Kokoro
         {
-            let mut engine = kokoro.lock().unwrap();
-            if !engine.is_loaded() {
-                drop(engine);
-                let k = kokoro.clone();
-                if let Err(e) = tokio::task::spawn_blocking(move || {
-                    tokio::runtime::Handle::current()
-                        .block_on(async { k.lock().unwrap().load().await })
-                })
-                .await
-                .unwrap_or_else(|e| Err(anyhow::anyhow!("{}", e)))
-                {
+            let mut guard = kokoro.lock().await;
+            if !guard.is_loaded() {
+                if let Err(e) = guard.load().await {
+                    drop(guard);
                     sm.lock()
                         .unwrap()
                         .emit_error("tts_load_failed", &e.to_string());
@@ -412,16 +488,13 @@ async fn tts_sentence_loop(
             }
         }
 
-        sm.lock()
-            .unwrap()
-            .transition(RenState::Speaking)
-            .ok();
+        sm.lock().unwrap().transition(RenState::Speaking).ok();
 
-        let sample_rate = kokoro.lock().unwrap().sample_rate();
-
-        let audio = {
-            let engine = kokoro.lock().unwrap();
-            engine.synthesize(&sentence).await
+        let (sample_rate, audio) = {
+            let engine = kokoro.lock().await;
+            let sr = engine.sample_rate();
+            let a = engine.synthesize(&sentence).await;
+            (sr, a)
         };
 
         match audio {

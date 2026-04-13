@@ -1,24 +1,18 @@
 /**
  * DownloadOverlay
- * Shown during first-run model downloads.
- * Displays a minimal progress bar with step name and speed.
+ * Full-screen overlay shown during first-run model downloads.
+ * Minimal progress indicator with step label, bar, and transfer meta.
  */
 
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRenStore } from '../store';
+import { formatBytes, formatSpeed } from '../utils/format';
 import styles from './DownloadOverlay.module.css';
 
-const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-};
-
-const formatSpeed = (bps: number): string => {
-  if (bps === 0) return '';
-  return `${formatBytes(bps)}/s`;
+const progressPct = (downloaded: number, total: number): number => {
+  if (total <= 0) return 0;
+  return Math.min(100, Math.max(0, (downloaded / total) * 100));
 };
 
 export const DownloadOverlay = () => {
@@ -27,22 +21,28 @@ export const DownloadOverlay = () => {
 
   if (!progress) return null;
 
-  const pct =
-    progress.totalBytes > 0
-      ? Math.min(100, (progress.downloadedBytes / progress.totalBytes) * 100)
-      : 0;
+  const pct = progressPct(progress.downloadedBytes, progress.totalBytes);
+  const stepLabel = t(`download.steps.${progress.step}`, {
+    defaultValue: t('download.unknown_step'),
+  });
+
+  const barStyle = { '--progress': `${pct}%` } as CSSProperties;
+  const downloaded = formatBytes(progress.downloadedBytes);
+  const total = progress.totalBytes > 0 ? formatBytes(progress.totalBytes) : null;
+  const speed = formatSpeed(progress.speedBps);
 
   return (
     <div className={styles.overlay}>
       <span className={styles.title}>{t('welcome.initializing')}</span>
-      <span className={styles.step}>{progress.step}</span>
+      <span className={styles.step}>{stepLabel}</span>
       <div className={styles.barContainer}>
-        <div className={styles.barFill} style={{ width: `${pct}%` }} />
+        <div className={styles.barFill} style={barStyle} />
       </div>
       <span className={styles.meta}>
-        {formatBytes(progress.downloadedBytes)}
-        {progress.totalBytes > 0 && ` / ${formatBytes(progress.totalBytes)}`}
-        {progress.speedBps > 0 && `  —  ${formatSpeed(progress.speedBps)}`}
+        {downloaded}
+        {total && ` / ${total}`}
+        {speed && <span className={styles.separator}>—</span>}
+        {speed}
       </span>
     </div>
   );

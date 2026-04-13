@@ -3,7 +3,7 @@
   bottom: calc(var(--ren-orb-size-idle) / 2 + var(--ren-space-6));
   left: 50%;
   transform: translateX(-50%);
-  width: 260px;
+  width: var(--ren-transcript-max-width);
   text-align: center;
   pointer-events: none;
 }
@@ -15,5 +15,5 @@
   line-height: var(--ren-leading-relaxed);
   font-family: var(--ren-font-mono);
   letter-spacing: 0.02em;
-  text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+  text-shadow: var(--ren-text-glow-subtle);
 }

@@ -1,56 +1,111 @@
 use anyhow::{Context, Result};
-use rodio::{OutputStream, OutputStreamHandle, Sink};
+use rodio::{OutputStream, Sink};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
-use tracing::info;
+use tokio::sync::{mpsc, oneshot};
+use tracing::{error, info};
 
 use crate::tts::AudioBuffer;
 
 /// Amplitude payload sent to the frontend for waveform visualization.
 #[derive(Clone, Serialize)]
 pub struct WaveformPayload {
-    /// 8 normalized amplitude values (0.0–1.0) representing waveform bars.
+    /// Normalized amplitude values (0.0–1.0) representing waveform bars.
     pub amplitudes: Vec<f32>,
 }
 
 const WAVEFORM_BARS: usize = 8;
 
+/// Playback command sent to the dedicated audio thread.
+struct PlayCommand {
+    buffer: AudioBuffer,
+    sample_rate: u32,
+    done: oneshot::Sender<Result<()>>,
+}
+
 /// Manages the audio output stream for TTS playback.
-/// Emits `ren://waveform` events during playback for the speaking animation.
+///
+/// `rodio::OutputStream` is `!Send` (it owns CPAL handles), so the actual
+/// stream lives on a dedicated OS thread. `AudioPlayer` holds only the
+/// command sender, making it safely shareable across async tasks.
 pub struct AudioPlayer {
-    _stream: OutputStream,
-    handle: OutputStreamHandle,
+    cmd_tx: mpsc::UnboundedSender<PlayCommand>,
 }
 
 impl AudioPlayer {
     pub fn new() -> Result<Self> {
-        let (_stream, handle) =
-            OutputStream::try_default().context("Failed to open audio output device")?;
+        let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<PlayCommand>();
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<Result<()>>();
+
+        std::thread::Builder::new()
+            .name("ren-audio".into())
+            .spawn(move || {
+                let (_stream, handle) = match OutputStream::try_default()
+                    .context("Failed to open audio output device")
+                {
+                    Ok(s) => {
+                        let _ = ready_tx.send(Ok(()));
+                        s
+                    }
+                    Err(e) => {
+                        let _ = ready_tx.send(Err(anyhow::anyhow!(e.to_string())));
+                        return;
+                    }
+                };
+
+                while let Some(cmd) = cmd_rx.blocking_recv() {
+                    let result = (|| -> Result<()> {
+                        let sink = Sink::try_new(&handle)
+                            .context("Failed to create audio sink")?;
+                        let source = rodio::buffer::SamplesBuffer::new(
+                            1,
+                            cmd.sample_rate,
+                            cmd.buffer,
+                        );
+                        sink.append(source);
+                        sink.sleep_until_end();
+                        Ok(())
+                    })();
+                    let _ = cmd.done.send(result);
+                }
+            })
+            .context("Failed to spawn audio thread")?;
+
+        ready_rx
+            .recv()
+            .context("Audio thread terminated before ready signal")??;
+
         info!("Audio player initialized");
-        Ok(Self { _stream, handle })
+        Ok(Self { cmd_tx })
     }
 
     /// Play a PCM audio buffer and emit waveform events to the frontend.
-    /// Blocks (async via spawn_blocking) until playback is complete.
-    pub async fn play(&self, app: &AppHandle, buffer: AudioBuffer, sample_rate: u32) -> Result<()> {
-        // Emit waveform events before playback starts for UI responsiveness
+    /// Awaits playback completion on the dedicated audio thread.
+    pub async fn play(
+        &self,
+        app: &AppHandle,
+        buffer: AudioBuffer,
+        sample_rate: u32,
+    ) -> Result<()> {
         let waveform = compute_waveform(&buffer, WAVEFORM_BARS);
-        let _ = app.emit("ren://waveform", WaveformPayload { amplitudes: waveform });
+        let _ = app.emit(
+            "ren://waveform",
+            WaveformPayload { amplitudes: waveform },
+        );
 
-        let sink = Sink::try_new(&self.handle).context("Failed to create audio sink")?;
+        let (done_tx, done_rx) = oneshot::channel();
+        self.cmd_tx
+            .send(PlayCommand {
+                buffer,
+                sample_rate,
+                done: done_tx,
+            })
+            .map_err(|_| anyhow::anyhow!("Audio thread is no longer running"))?;
 
-        // Convert f32 buffer to rodio Source
-        let source = rodio::buffer::SamplesBuffer::new(1, sample_rate, buffer);
-        sink.append(source);
+        let result = done_rx
+            .await
+            .context("Audio thread dropped completion channel")?;
 
-        // Wait for playback to complete
-        tokio::task::spawn_blocking(move || {
-            sink.sleep_until_end();
-        })
-        .await
-        .context("Playback task panicked")?;
-
-        // Clear waveform when done
         let _ = app.emit(
             "ren://waveform",
             WaveformPayload {
@@ -58,7 +113,10 @@ impl AudioPlayer {
             },
         );
 
-        Ok(())
+        if let Err(ref e) = result {
+            error!("Playback failed: {}", e);
+        }
+        result
     }
 }
 
@@ -77,12 +135,10 @@ fn compute_waveform(buffer: &[f32], bar_count: usize) -> Vec<f32> {
         bars.push(rms);
     }
 
-    // Pad if buffer was smaller than expected
     while bars.len() < bar_count {
         bars.push(0.0);
     }
 
-    // Normalize to [0, 1]
     let max = bars.iter().cloned().fold(0.0f32, f32::max);
     if max > 0.0 {
         bars.iter_mut().for_each(|v| *v /= max);

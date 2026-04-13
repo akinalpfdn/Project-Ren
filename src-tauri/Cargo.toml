@@ -28,7 +28,7 @@ tokio               = { version = "1", features = ["full"] }
 cpal                = "0.15"
 
 # Voice activity detection
-voice_activity_detector = "0.1"
+voice_activity_detector = "0.2"
 
 # Speech-to-text (whisper.cpp bindings)
 # Optional: only links native whisper.cpp when "stt" feature enabled.
@@ -67,7 +67,7 @@ rodio               = "0.19"
 
 # ONNX Runtime (Kokoro TTS)
 # Optional: only links native ORT when "tts" feature is enabled.
-ort                 = { version = "2", optional = true }
+ort                 = { version = "=2.0.0-rc.10", optional = true }
 
 # ndarray for audio tensor manipulation
 ndarray             = { version = "0.16", optional = true }
@@ -75,12 +75,17 @@ ndarray             = { version = "0.16", optional = true }
 # Sentence splitting for streaming TTS pipeline
 unicode-segmentation = "1"
 
+# Wake word detection (Picovoice Porcupine)
+# Optional: only links the native Porcupine library when "wake" is enabled.
+pv_porcupine        = { git = "https://github.com/Picovoice/porcupine.git", tag = "v3.0", optional = true }
+
 # Windows-specific native APIs
 [target.'cfg(windows)'.dependencies]
 windows             = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_System_Com",
     "Win32_System_Threading",
+    "Win32_System_JobObjects",
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
     "Win32_Security",
@@ -93,3 +98,5 @@ default = []
 stt = ["whisper-rs"]
 # Enable real Kokoro TTS — requires ONNX Runtime native library.
 tts = ["ort", "ndarray"]
+# Enable Porcupine wake word detection — requires Picovoice native library at runtime.
+wake = ["pv_porcupine"]

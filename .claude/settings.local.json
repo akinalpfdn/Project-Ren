@@ -4,7 +4,9 @@
       "Bash(npm --version:*)",
       "Bash(cargo --version:*)",
       "Bash(npm create:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(cargo check:*)"
     ]
   }
 }

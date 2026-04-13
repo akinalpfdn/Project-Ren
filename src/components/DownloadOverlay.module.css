@@ -1,14 +1,14 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: var(--ren-bg-primary);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--ren-space-6);
-  z-index: var(--ren-z-modal);
   padding: var(--ren-space-8);
+  background: var(--ren-bg-primary);
+  z-index: var(--ren-z-modal);
 }
 
 .title {
@@ -27,23 +27,30 @@
 }
 
 .barContainer {
-  width: 220px;
-  height: 2px;
+  width: var(--ren-download-bar-width);
+  height: var(--ren-download-bar-height);
+  overflow: hidden;
   background: var(--ren-bg-elevated);
   border-radius: var(--ren-radius-full);
-  overflow: hidden;
 }
 
 .barFill {
   height: 100%;
+  width: var(--progress, 0%);
   background: var(--ren-accent-primary);
   border-radius: var(--ren-radius-full);
   box-shadow: var(--ren-glow-subtle);
-  transition: width 300ms var(--ren-ease-out);
+  transition: width var(--ren-duration-normal) var(--ren-ease-out);
 }
 
 .meta {
   font-size: var(--ren-text-xs);
   color: var(--ren-text-tertiary);
   font-family: var(--ren-font-mono);
+  letter-spacing: 0.02em;
+}
+
+.separator {
+  margin: 0 var(--ren-space-3);
+  color: var(--ren-text-tertiary);
 }

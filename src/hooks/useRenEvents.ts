@@ -4,9 +4,10 @@
  * Call once at the app root.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useRenStore } from '../store';
+import { TRANSCRIPT_VISIBLE_MS } from '../config/ui';
 import type {
   StateChangedPayload,
   TranscriptPayload,
@@ -15,66 +16,88 @@ import type {
   WaveformPayload,
 } from '../types';
 
+const EVT_STATE = 'ren://state-changed';
+const EVT_TRANSCRIPT = 'ren://transcript';
+const EVT_DOWNLOAD = 'ren://download-progress';
+const EVT_ERROR = 'ren://error';
+const EVT_WAVEFORM = 'ren://waveform';
+
 export const useRenEvents = () => {
-  const { setState, setError, setTranscript, setDownloadProgress, setWaveform } =
-    useRenStore();
+  // Stable action references — Zustand guarantees these are referentially stable,
+  // so selecting them individually avoids re-subscribing on state updates.
+  const setState = useRenStore((s) => s.setState);
+  const setError = useRenStore((s) => s.setError);
+  const setTranscript = useRenStore((s) => s.setTranscript);
+  const setDownloadProgress = useRenStore((s) => s.setDownloadProgress);
+  const setWaveform = useRenStore((s) => s.setWaveform);
+
+  const transcriptTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const unlisten: Array<() => void> = [];
+    let cancelled = false;
+
+    const clearTranscriptTimer = () => {
+      if (transcriptTimer.current !== null) {
+        window.clearTimeout(transcriptTimer.current);
+        transcriptTimer.current = null;
+      }
+    };
 
     const setup = async () => {
-      unlisten.push(
-        await listen<StateChangedPayload>('ren://state-changed', (event) => {
-          setState(event.payload.state);
-        })
-      );
+      const [stateOff, transcriptOff, downloadOff, errorOff, waveOff] = await Promise.all([
+        listen<StateChangedPayload>(EVT_STATE, (e) => setState(e.payload.state)),
 
-      unlisten.push(
-        await listen<TranscriptPayload>('ren://transcript', (event) => {
-          if (event.payload.is_final) {
-            setTranscript(event.payload.text);
-            // Auto-clear transcript after 8 seconds
-            setTimeout(() => setTranscript(null), 8000);
-          }
-        })
-      );
+        listen<TranscriptPayload>(EVT_TRANSCRIPT, (e) => {
+          if (!e.payload.is_final) return;
+          setTranscript(e.payload.text);
+          clearTranscriptTimer();
+          transcriptTimer.current = window.setTimeout(() => {
+            setTranscript(null);
+            transcriptTimer.current = null;
+          }, TRANSCRIPT_VISIBLE_MS);
+        }),
 
-      unlisten.push(
-        await listen<DownloadProgressPayload>(
-          'ren://download-progress',
-          (event) => {
-            const p = event.payload;
-            setDownloadProgress({
-              step: p.step,
-              downloadedBytes: p.downloaded_bytes,
-              totalBytes: p.total_bytes,
-              speedBps: p.speed_bps,
-            });
-          }
-        )
-      );
-
-      unlisten.push(
-        await listen<ErrorPayload>('ren://error', (event) => {
-          setError({
-            code: event.payload.code,
-            message: event.payload.message,
-            timestamp: Date.now(),
+        listen<DownloadProgressPayload>(EVT_DOWNLOAD, (e) => {
+          const p = e.payload;
+          setDownloadProgress({
+            step: p.step,
+            downloadedBytes: p.downloaded_bytes,
+            totalBytes: p.total_bytes,
+            speedBps: p.speed_bps,
           });
-        })
-      );
+        }),
 
-      unlisten.push(
-        await listen<WaveformPayload>('ren://waveform', (event) => {
-          setWaveform(event.payload.amplitudes);
-        })
-      );
+        listen<ErrorPayload>(EVT_ERROR, (e) =>
+          setError({
+            code: e.payload.code,
+            message: e.payload.message,
+            timestamp: Date.now(),
+          })
+        ),
+
+        listen<WaveformPayload>(EVT_WAVEFORM, (e) => setWaveform(e.payload.amplitudes)),
+      ]);
+
+      // If unmounted while awaiting, drop subscriptions immediately.
+      if (cancelled) {
+        stateOff();
+        transcriptOff();
+        downloadOff();
+        errorOff();
+        waveOff();
+        return;
+      }
+
+      unlisten.push(stateOff, transcriptOff, downloadOff, errorOff, waveOff);
     };
 
     setup();
 
     return () => {
-      unlisten.forEach((fn) => fn());
+      cancelled = true;
+      clearTranscriptTimer();
+      unlisten.forEach((off) => off());
     };
   }, [setState, setError, setTranscript, setDownloadProgress, setWaveform]);
 };

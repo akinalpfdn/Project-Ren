@@ -1,15 +1,16 @@
 /**
- * Orb Component Styles
- * Futuristic orb with state-based animations
+ * Orb styles
+ * One orb element, state-driven appearance via modifier classes.
+ * All tokens live in styles/theme.css.
  */
 
 .container {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
-  position: relative;
+  pointer-events: none;
 }
 
 .orb {
@@ -18,12 +19,42 @@
   height: var(--ren-orb-size-idle);
   border-radius: var(--ren-radius-full);
   background: var(--ren-gradient-radial-primary);
-  border: 2px solid var(--ren-accent-primary);
+  border: 1px solid var(--ren-accent-primary);
   box-shadow: var(--ren-glow-idle);
-  transition: all var(--ren-duration-normal) var(--ren-ease-smooth);
+  transition:
+    width var(--ren-duration-normal) var(--ren-ease-smooth),
+    height var(--ren-duration-normal) var(--ren-ease-smooth),
+    box-shadow var(--ren-duration-normal) var(--ren-ease-smooth),
+    border-color var(--ren-duration-normal) var(--ren-ease-smooth),
+    opacity var(--ren-duration-normal) var(--ren-ease-smooth);
 }
 
-/* ====== State: Idle - Breathing animation ====== */
+/* ===== State: Sleeping ===== */
+
+.orb.sleeping {
+  opacity: var(--ren-orb-sleeping-opacity);
+  border-color: var(--ren-accent-tertiary);
+  box-shadow: var(--ren-glow-subtle);
+}
+
+/* ===== State: Initializing ===== */
+
+.orb.initializing {
+  opacity: 0.7;
+  animation: initialize var(--ren-duration-breath) var(--ren-ease-in-out) infinite;
+}
+
+@keyframes initialize {
+  0%,
+  100% {
+    transform: scale(0.95);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* ===== State: Idle — Breathing ===== */
 
 .orb.idle {
   animation: breathe var(--ren-duration-breath) var(--ren-ease-in-out) infinite;
@@ -43,7 +74,33 @@
   }
 }
 
-/* ====== State: Listening - Reactive pulse ====== */
+/* ===== State: Waking ===== */
+
+.orb.waking {
+  border-color: var(--ren-accent-primary);
+  box-shadow: var(--ren-glow-listening);
+  animation: wake var(--ren-duration-slow) var(--ren-ease-bounce);
+}
+
+@keyframes wake {
+  0% {
+    transform: scale(0.6);
+    opacity: var(--ren-orb-sleeping-opacity);
+    box-shadow: var(--ren-glow-subtle);
+  }
+  60% {
+    transform: scale(var(--ren-orb-wake-overshoot));
+    opacity: 1;
+    box-shadow: var(--ren-glow-speaking);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: var(--ren-glow-listening);
+  }
+}
+
+/* ===== State: Listening — Reactive pulse ===== */
 
 .orb.listening {
   width: var(--ren-orb-size-active);
@@ -63,7 +120,7 @@
   }
 }
 
-/* ====== State: Thinking - Orbital particles ====== */
+/* ===== State: Thinking — Orbital particles ===== */
 
 .orb.thinking {
   box-shadow: var(--ren-glow-thinking);
@@ -71,58 +128,47 @@
 
 .particles {
   position: absolute;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
+  inset: 0;
   pointer-events: none;
 }
 
 .particle {
   position: absolute;
-  width: 6px;
-  height: 6px;
+  top: 50%;
+  left: 50%;
+  width: var(--ren-particle-size);
+  height: var(--ren-particle-size);
+  margin-left: calc(var(--ren-particle-size) / -2);
+  margin-top: calc(var(--ren-particle-size) / -2);
   background: var(--ren-accent-primary);
   border-radius: var(--ren-radius-full);
   box-shadow: var(--ren-glow-subtle);
-  top: 50%;
-  left: 50%;
-  margin-left: -3px;
-  margin-top: -3px;
+  animation: orbit var(--ren-duration-particle) var(--ren-ease-linear) infinite;
 }
 
 .particle:nth-child(1) {
-  animation: orbit var(--ren-duration-particle) var(--ren-ease-linear) infinite;
-  animation-delay: 0ms;
+  animation-delay: calc(var(--ren-duration-particle) * 0);
 }
-
 .particle:nth-child(2) {
-  animation: orbit var(--ren-duration-particle) var(--ren-ease-linear) infinite;
-  animation-delay: 1000ms;
+  animation-delay: calc(var(--ren-duration-particle) * -0.25);
 }
-
 .particle:nth-child(3) {
-  animation: orbit var(--ren-duration-particle) var(--ren-ease-linear) infinite;
-  animation-delay: 2000ms;
+  animation-delay: calc(var(--ren-duration-particle) * -0.5);
 }
-
 .particle:nth-child(4) {
-  animation: orbit var(--ren-duration-particle) var(--ren-ease-linear) infinite;
-  animation-delay: 3000ms;
+  animation-delay: calc(var(--ren-duration-particle) * -0.75);
 }
 
 @keyframes orbit {
   from {
-    transform: rotate(0deg) translateX(var(--ren-particle-orbit-radius))
-      rotate(0deg);
+    transform: rotate(0deg) translateX(var(--ren-particle-orbit-radius)) rotate(0deg);
   }
   to {
-    transform: rotate(360deg) translateX(var(--ren-particle-orbit-radius))
-      rotate(-360deg);
+    transform: rotate(360deg) translateX(var(--ren-particle-orbit-radius)) rotate(-360deg);
   }
 }
 
-/* ====== State: Speaking - Waveform ====== */
+/* ===== State: Speaking — Data-driven waveform ===== */
 
 .orb.speaking {
   box-shadow: var(--ren-glow-speaking);
@@ -130,82 +176,29 @@
 
 .waveform {
   position: absolute;
+  top: 50%;
+  left: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  width: 120px;
-  height: 60px;
-  top: 50%;
-  left: 50%;
+  gap: var(--ren-waveform-gap);
+  width: var(--ren-waveform-width);
+  height: var(--ren-waveform-height);
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
 
 .waveBar {
-  width: 3px;
+  width: var(--ren-waveform-bar-width);
   height: 100%;
   background: var(--ren-accent-primary);
   border-radius: var(--ren-radius-sm);
-  animation: wave 1s var(--ren-ease-in-out) infinite;
+  box-shadow: var(--ren-glow-subtle);
+  transform-origin: center;
+  transition: transform var(--ren-duration-fast) var(--ren-ease-out);
 }
 
-.waveBar:nth-child(1) {
-  animation-delay: 0ms;
-}
-.waveBar:nth-child(2) {
-  animation-delay: 100ms;
-}
-.waveBar:nth-child(3) {
-  animation-delay: 200ms;
-}
-.waveBar:nth-child(4) {
-  animation-delay: 300ms;
-}
-.waveBar:nth-child(5) {
-  animation-delay: 400ms;
-}
-.waveBar:nth-child(6) {
-  animation-delay: 500ms;
-}
-.waveBar:nth-child(7) {
-  animation-delay: 600ms;
-}
-.waveBar:nth-child(8) {
-  animation-delay: 700ms;
-}
-
-@keyframes wave {
-  0%,
-  100% {
-    transform: scaleY(0.3);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-}
-
-/* ====== State: Waking ====== */
-
-.orb.waking {
-  animation: wake var(--ren-duration-normal) var(--ren-ease-out);
-}
-
-@keyframes wake {
-  0% {
-    transform: scale(0.8);
-    opacity: 0.5;
-  }
-  50% {
-    transform: scale(1.15);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* ====== State: Error ====== */
+/* ===== State: Error ===== */
 
 .orb.error {
   border-color: var(--ren-state-error);
@@ -219,26 +212,9 @@
     transform: translateX(0);
   }
   25% {
-    transform: translateX(-5px);
+    transform: translateX(calc(var(--ren-shake-amplitude) * -1));
   }
   75% {
-    transform: translateX(5px);
-  }
-}
-
-/* ====== State: Initializing ====== */
-
-.orb.initializing {
-  opacity: 0.7;
-  animation: initialize 2s var(--ren-ease-in-out) infinite;
-}
-
-@keyframes initialize {
-  0%,
-  100% {
-    transform: scale(0.95) rotate(0deg);
-  }
-  50% {
-    transform: scale(1.05) rotate(180deg);
+    transform: translateX(var(--ren-shake-amplitude));
   }
 }

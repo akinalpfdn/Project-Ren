@@ -91,10 +91,9 @@ fn score_frame(vad: &mut VoiceActivityDetector, frame: &[f32]) -> bool {
             .map(|&s| (s * i16::MAX as f32) as i16)
             .collect();
 
-        if let Ok(probability) = vad.predict(i16_samples) {
-            if probability > 0.5 {
-                any_voiced = true;
-            }
+        let probability = vad.predict(i16_samples);
+        if probability > 0.5 {
+            any_voiced = true;
         }
     }
 

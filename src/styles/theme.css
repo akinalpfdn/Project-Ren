@@ -54,6 +54,9 @@
 
   --ren-glow-subtle: 0 0 10px rgba(0, 212, 255, 0.2);
 
+  /* Text glow — for monospace transcript / status text */
+  --ren-text-glow-subtle: 0 0 10px rgba(0, 212, 255, 0.3);
+
   /* ====== Gradients ====== */
 
   --ren-gradient-radial-primary: radial-gradient(
@@ -167,9 +170,31 @@
   --ren-orb-size-idle: 80px;
   --ren-orb-size-active: 100px;
 
-  /* Particle orbit radius */
+  /* Thinking particles */
+  --ren-particle-size: 6px;
   --ren-particle-orbit-radius: 60px;
 
-  /* Waveform bar count */
-  --ren-waveform-bars: 24;
+  /* Speaking waveform */
+  --ren-waveform-width: 120px;
+  --ren-waveform-height: 60px;
+  --ren-waveform-bar-width: 3px;
+  --ren-waveform-gap: 3px;
+  --ren-waveform-bar-min-scale: 0.15;
+
+  /* ====== Component Widths ====== */
+
+  --ren-transcript-max-width: 260px;
+  --ren-download-bar-width: 220px;
+  --ren-download-bar-height: 2px;
+
+  /* ====== Motion ====== */
+
+  /* Decorative transforms — shake amplitude for error state, etc. */
+  --ren-shake-amplitude: 5px;
+
+  /* Sleeping state opacity — barely visible, "off" but present */
+  --ren-orb-sleeping-opacity: 0.25;
+
+  /* Waking burst overshoot scale */
+  --ren-orb-wake-overshoot: 1.25;
 }
