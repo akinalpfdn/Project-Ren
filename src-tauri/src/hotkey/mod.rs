@@ -9,11 +9,11 @@ use tracing::{info, warn};
 /// Events emitted by the hotkey listener.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HotkeyEvent {
-    /// Ctrl+Alt+R pressed — start push-to-talk recording.
+    /// Ctrl+Shift+Alt+R pressed — start push-to-talk recording.
     PushToTalkStart,
-    /// Ctrl+Alt+R released — stop recording, run transcription.
+    /// Ctrl+Shift+Alt+R released — stop recording, run transcription.
     PushToTalkEnd,
-    /// Ctrl+Alt+S — force Ren back to Sleeping state.
+    /// Ctrl+Shift+Alt+S — force Ren back to Sleeping state.
     ForceSleep,
 }
 
@@ -23,32 +23,30 @@ pub fn start(event_tx: mpsc::Sender<HotkeyEvent>) -> Result<GlobalHotKeyManager>
     let manager = GlobalHotKeyManager::new()
         .context("Failed to initialize global hotkey manager")?;
 
-    // Ctrl+Alt+R — push-to-talk
-    let ptr_hotkey = HotKey::new(
-        Some(Modifiers::CONTROL | Modifiers::ALT),
-        Code::KeyR,
-    );
+    let triple_mod = Modifiers::CONTROL | Modifiers::SHIFT | Modifiers::ALT;
 
-    // Ctrl+Alt+S — force sleep
-    let sleep_hotkey = HotKey::new(
-        Some(Modifiers::CONTROL | Modifiers::ALT),
-        Code::KeyS,
-    );
+    // Ctrl+Shift+Alt+R — push-to-talk
+    let ptr_hotkey = HotKey::new(Some(triple_mod), Code::KeyR);
+
+    // Ctrl+Shift+Alt+S — force sleep
+    let sleep_hotkey = HotKey::new(Some(triple_mod), Code::KeyS);
 
     let ptr_id = ptr_hotkey.id();
     let sleep_id = sleep_hotkey.id();
 
     manager
         .register(ptr_hotkey)
-        .context("Failed to register Ctrl+Alt+R hotkey")?;
+        .context("Failed to register Ctrl+Shift+Alt+R hotkey")?;
     manager
         .register(sleep_hotkey)
-        .context("Failed to register Ctrl+Alt+S hotkey")?;
+        .context("Failed to register Ctrl+Shift+Alt+S hotkey")?;
 
-    info!("Hotkeys registered: Ctrl+Alt+R (push-to-talk), Ctrl+Alt+S (force sleep)");
+    info!(
+        "Hotkeys registered: Ctrl+Shift+Alt+R (push-to-talk), Ctrl+Shift+Alt+S (force sleep)"
+    );
 
-    // Spawn listener task
-    tokio::spawn(async move {
+    // Spawn listener task on Tauri's async runtime (called from sync setup closure).
+    tauri::async_runtime::spawn(async move {
         let receiver = GlobalHotKeyEvent::receiver();
         loop {
             if let Ok(event) = receiver.try_recv() {

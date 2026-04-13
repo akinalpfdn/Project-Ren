@@ -103,11 +103,21 @@ impl SttEngine for WhisperEngine {
                 let mut p = whisper_rs::FullParams::new(
                     whisper_rs::SamplingStrategy::Greedy { best_of: 1 },
                 );
-                p.set_language(Some("tr")); // Turkish input
+                p.set_language(Some("tr"));
                 p.set_translate(false);
                 p.set_print_progress(false);
                 p.set_print_realtime(false);
                 p.set_print_special(false);
+                // Suppress Whisper's Turkish-subtitle hallucination ("Altyazı: M.K.",
+                // "Altyazı çevirmeni: …") which surfaces on pauses and silent tail-ends.
+                // Higher no_speech threshold skips low-confidence silent windows;
+                // suppress_blank kills empty-token predictions; the initial prompt
+                // anchors the model to a command domain instead of movie credits.
+                p.set_no_speech_thold(0.6);
+                p.set_suppress_blank(true);
+                p.set_initial_prompt(
+                    "Kısa sesli komutlar. Asistan konuşması. Film altyazısı değildir.",
+                );
                 p
             };
 
@@ -117,10 +127,17 @@ impl SttEngine for WhisperEngine {
                     .full(params, &audio_owned)
                     .context("Whisper transcription failed")?;
 
-                let num_segments = state.full_n_segments()?;
+                let num_segments = state.full_n_segments();
                 let mut result = String::new();
                 for i in 0..num_segments {
-                    result.push_str(&state.full_get_segment_text(i)?);
+                    let segment = state
+                        .get_segment(i)
+                        .context("Whisper segment index out of range")?;
+                    result.push_str(
+                        segment
+                            .to_str()
+                            .context("Whisper segment text not valid UTF-8")?,
+                    );
                 }
                 Ok(result.trim().to_string())
             })

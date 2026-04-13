@@ -111,13 +111,18 @@ pub fn run() {
             let (sentence_tx, sentence_rx) = mpsc::channel::<String>(32);
             let (llm_token_tx, _llm_token_rx) = mpsc::channel::<String>(256);
 
-            // Audio pipeline
-            let _audio_stream = audio::start_pipeline(vad_event_tx)
+            // Audio pipeline — leaked intentionally so the cpal Stream and VAD task
+            // live for the entire process lifetime. Dropping the setup-scope handle
+            // would silently stop capture.
+            let audio_stream = audio::start_pipeline(vad_event_tx)
                 .expect("Failed to start audio pipeline");
+            Box::leak(Box::new(audio_stream));
 
-            // Hotkeys
-            let _hotkey_manager = hotkey::start(hotkey_event_tx)
+            // Hotkeys — same reasoning: manager drop would unregister every hotkey
+            // and kill the listener task.
+            let hotkey_manager = hotkey::start(hotkey_event_tx)
                 .expect("Failed to register hotkeys");
+            Box::leak(Box::new(hotkey_manager));
 
             // Engines (lazily loaded)
             let whisper: SharedWhisper = Arc::new(AsyncMutex::new(WhisperEngine::new()));
@@ -133,7 +138,7 @@ pub fn run() {
             // Ollama child process (started async after setup)
             let ollama_child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
             let ollama_child_clone = ollama_child.clone();
-            tokio::spawn(async move {
+            tauri::async_runtime::spawn(async move {
                 match llm::ollama_process::start().await {
                     Ok(child) => {
                         *ollama_child_clone.lock().unwrap() = Some(child);
@@ -150,7 +155,7 @@ pub fn run() {
             let player_clone = player.clone();
             let sm_for_tts = state_machine.clone();
             let app_for_tts = app_handle.clone();
-            tokio::spawn(async move {
+            tauri::async_runtime::spawn(async move {
                 tts_sentence_loop(
                     app_for_tts,
                     sm_for_tts,
@@ -181,7 +186,7 @@ pub fn run() {
                 Conversation::new(Some(tool_registry.as_ref())),
             ));
             let registry_for_loop = tool_registry.clone();
-            tokio::spawn(async move {
+            tauri::async_runtime::spawn(async move {
                 event_loop(
                     handle,
                     sm,
@@ -235,7 +240,7 @@ pub fn run() {
 /// Any transition out of Idle cancels the pending sleep.
 fn spawn_conversation_timer(sm: SharedStateMachine, timeout: Duration) {
     let mut rx = sm.lock().unwrap().subscribe();
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let mut idle_since: Option<Instant> = None;
 
         loop {
@@ -276,7 +281,7 @@ fn spawn_model_unloader(
     kokoro: SharedKokoro,
 ) {
     let mut rx = sm.lock().unwrap().subscribe();
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         loop {
             match rx.recv().await {
                 Ok(RenState::Sleeping) => {
@@ -443,7 +448,7 @@ async fn run_full_turn(
     let registry = registry.clone();
     let app_clone = app.clone();
 
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let mut conv = conv.lock().await;
         let result = llm::run_turn(
             &app_clone,

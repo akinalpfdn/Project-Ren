@@ -33,7 +33,7 @@ voice_activity_detector = "0.2"
 # Speech-to-text (whisper.cpp bindings)
 # Optional: only links native whisper.cpp when "stt" feature enabled.
 # Allows compilation on machines without whisper.cpp built.
-whisper-rs          = { version = "0.13", optional = true }
+whisper-rs          = { version = "0.16", optional = true, features = ["cuda"] }
 
 # Global hotkey (Ctrl+Alt+R push-to-talk)
 global-hotkey       = "0.6"

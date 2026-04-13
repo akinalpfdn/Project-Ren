@@ -3,7 +3,7 @@ pub mod defaults;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use directories::ProjectDirs;
+use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -104,10 +104,13 @@ pub fn config_path() -> Result<PathBuf> {
 }
 
 /// Returns the `%APPDATA%\Ren\` base directory, creating it if missing.
+/// Uses `BaseDirs::data_dir()` — which maps to `%APPDATA%` on Windows —
+/// and appends a single `Ren` segment so the final path matches the
+/// documented Windows-native layout.
 pub fn app_data_dir() -> Result<PathBuf> {
-    let dirs = ProjectDirs::from("com", "ren", "Ren")
-        .context("Failed to resolve application data directory")?;
-    let path = dirs.data_dir().to_path_buf();
+    let base = BaseDirs::new()
+        .context("Failed to resolve user base directories")?;
+    let path = base.data_dir().join(APP_DIR_NAME);
     std::fs::create_dir_all(&path)
         .with_context(|| format!("Failed to create app data directory at {}", path.display()))?;
     Ok(path)

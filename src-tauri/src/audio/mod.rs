@@ -18,8 +18,8 @@ pub fn start_pipeline(
 
     let (stream, audio_rx) = capture::start_capture(frame_duration_ms)?;
 
-    // Spawn VAD task
-    tokio::spawn(async move {
+    // Spawn VAD task on Tauri's async runtime (this runs in the sync setup closure).
+    tauri::async_runtime::spawn(async move {
         vad::run(audio_rx, vad_event_tx).await;
     });
 

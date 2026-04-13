@@ -1,6 +1,11 @@
 /// All default configuration values in one place.
 /// Change a default here — it applies everywhere.
 
+// Application
+/// Folder name under `%APPDATA%` (Windows) / `$XDG_DATA_HOME` (Linux).
+/// Produces `%APPDATA%\Ren\` — the documented, single-segment layout.
+pub const APP_DIR_NAME: &str = "Ren";
+
 // Audio
 pub const AUDIO_SAMPLE_RATE: u32 = 16_000;
 pub const AUDIO_CHANNELS: u16 = 1;
@@ -74,4 +79,4 @@ pub const DOWNLOAD_CHUNK_SIZE: usize = 8 * 1024 * 1024; // 8 MB
 // SHA256 hashes for model integrity verification.
 // Update these whenever model sources publish a new file.
 pub const WHISPER_LARGE_V3_SHA256: &str =
-    "964ef9a7b601b6847c71ba5d2d0f7e4f41cd5eed99b86e73c9b0bd0e9f69c8ec";
+    "64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2";
