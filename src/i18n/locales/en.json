@@ -1,0 +1,39 @@
+{
+  "app": {
+    "name": "Ren",
+    "version": "0.1.0"
+  },
+  "tray": {
+    "show": "Show Ren",
+    "hide": "Hide Ren",
+    "quit": "Quit"
+  },
+  "states": {
+    "initializing": "Initializing",
+    "sleeping": "Sleeping",
+    "waking": "Waking",
+    "listening": "Listening",
+    "thinking": "Thinking",
+    "speaking": "Speaking",
+    "idle": "Idle",
+    "error": "Error"
+  },
+  "errors": {
+    "unknown": "An unknown error occurred",
+    "microphone_permission": "Microphone permission denied. Please enable it in Windows Settings.",
+    "audio_init_failed": "Failed to initialize audio system",
+    "model_load_failed": "Failed to load AI model"
+  },
+  "settings": {
+    "title": "Settings",
+    "microphone": "Microphone",
+    "wake_sensitivity": "Wake Word Sensitivity",
+    "autostart": "Start with Windows",
+    "api_connections": "API Connections"
+  },
+  "welcome": {
+    "title": "Welcome to Ren",
+    "subtitle": "Your local AI assistant",
+    "initializing": "Initializing systems..."
+  }
+}

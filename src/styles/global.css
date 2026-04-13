@@ -1,0 +1,87 @@
+/**
+ * Global Styles
+ * Base resets and global rules
+ */
+
+@import './theme.css';
+
+/* Reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--ren-font-primary);
+  font-size: var(--ren-text-base);
+  font-weight: var(--ren-weight-normal);
+  line-height: var(--ren-leading-normal);
+  color: var(--ren-text-primary);
+  background-color: var(--ren-bg-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Disable text selection globally for a cleaner app feel */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Allow selection in input fields */
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Remove default button styles */
+button {
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Scrollbar styling for Windows */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--ren-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ren-accent-tertiary);
+  border-radius: var(--ren-radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ren-accent-secondary);
+}
+
+/* Focus outline for accessibility */
+:focus-visible {
+  outline: 2px solid var(--ren-accent-primary);
+  outline-offset: 2px;
+}

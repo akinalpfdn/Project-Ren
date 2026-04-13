@@ -1,0 +1,175 @@
+/**
+ * Ren Theme — Single Source of Truth
+ * All design tokens for the futuristic dark aesthetic.
+ * No hardcoded values anywhere else in the codebase.
+ */
+
+:root {
+  /* ====== Colors ====== */
+
+  /* Backgrounds */
+  --ren-bg-primary: #0a0a0a;
+  --ren-bg-secondary: #121212;
+  --ren-bg-elevated: #1a1a1a;
+  --ren-bg-overlay: rgba(10, 10, 10, 0.95);
+
+  /* Foreground */
+  --ren-text-primary: #e0e0e0;
+  --ren-text-secondary: #a0a0a0;
+  --ren-text-tertiary: #606060;
+  --ren-text-inverse: #0a0a0a;
+
+  /* Accent - Cyan glow theme */
+  --ren-accent-primary: #00d4ff;
+  --ren-accent-secondary: #00a3cc;
+  --ren-accent-tertiary: #007799;
+  --ren-accent-muted: rgba(0, 212, 255, 0.1);
+
+  /* State colors */
+  --ren-state-success: #00ff88;
+  --ren-state-warning: #ffaa00;
+  --ren-state-error: #ff4444;
+  --ren-state-info: #00d4ff;
+
+  /* ====== Glow Effects ====== */
+
+  /* Glow intensities for different states */
+  --ren-glow-idle: 0 0 20px rgba(0, 212, 255, 0.3),
+                   0 0 40px rgba(0, 212, 255, 0.15);
+
+  --ren-glow-listening: 0 0 30px rgba(0, 212, 255, 0.5),
+                        0 0 60px rgba(0, 212, 255, 0.3),
+                        0 0 90px rgba(0, 212, 255, 0.1);
+
+  --ren-glow-thinking: 0 0 25px rgba(0, 163, 204, 0.6),
+                       0 0 50px rgba(0, 163, 204, 0.4),
+                       0 0 75px rgba(0, 163, 204, 0.2);
+
+  --ren-glow-speaking: 0 0 35px rgba(0, 212, 255, 0.7),
+                       0 0 70px rgba(0, 212, 255, 0.5),
+                       0 0 105px rgba(0, 212, 255, 0.3);
+
+  --ren-glow-error: 0 0 20px rgba(255, 68, 68, 0.4),
+                    0 0 40px rgba(255, 68, 68, 0.2);
+
+  --ren-glow-subtle: 0 0 10px rgba(0, 212, 255, 0.2);
+
+  /* ====== Gradients ====== */
+
+  --ren-gradient-radial-primary: radial-gradient(
+    circle,
+    rgba(0, 212, 255, 0.15) 0%,
+    rgba(0, 212, 255, 0.05) 50%,
+    transparent 100%
+  );
+
+  --ren-gradient-radial-intense: radial-gradient(
+    circle,
+    rgba(0, 212, 255, 0.3) 0%,
+    rgba(0, 212, 255, 0.1) 50%,
+    transparent 100%
+  );
+
+  --ren-gradient-linear-accent: linear-gradient(
+    135deg,
+    var(--ren-accent-primary) 0%,
+    var(--ren-accent-secondary) 100%
+  );
+
+  /* ====== Typography ====== */
+
+  /* Font families */
+  --ren-font-primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+                      'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
+                      'Helvetica Neue', sans-serif;
+  --ren-font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+
+  /* Font sizes */
+  --ren-text-xs: 0.75rem;      /* 12px */
+  --ren-text-sm: 0.875rem;     /* 14px */
+  --ren-text-base: 1rem;       /* 16px */
+  --ren-text-lg: 1.125rem;     /* 18px */
+  --ren-text-xl: 1.25rem;      /* 20px */
+  --ren-text-2xl: 1.5rem;      /* 24px */
+  --ren-text-3xl: 1.875rem;    /* 30px */
+  --ren-text-4xl: 2.25rem;     /* 36px */
+
+  /* Font weights */
+  --ren-weight-normal: 400;
+  --ren-weight-medium: 500;
+  --ren-weight-semibold: 600;
+  --ren-weight-bold: 700;
+
+  /* Line heights */
+  --ren-leading-tight: 1.25;
+  --ren-leading-normal: 1.5;
+  --ren-leading-relaxed: 1.75;
+
+  /* ====== Spacing ====== */
+
+  --ren-space-1: 0.25rem;   /* 4px */
+  --ren-space-2: 0.5rem;    /* 8px */
+  --ren-space-3: 0.75rem;   /* 12px */
+  --ren-space-4: 1rem;      /* 16px */
+  --ren-space-5: 1.25rem;   /* 20px */
+  --ren-space-6: 1.5rem;    /* 24px */
+  --ren-space-8: 2rem;      /* 32px */
+  --ren-space-10: 2.5rem;   /* 40px */
+  --ren-space-12: 3rem;     /* 48px */
+  --ren-space-16: 4rem;     /* 64px */
+  --ren-space-20: 5rem;     /* 80px */
+
+  /* ====== Border Radius ====== */
+
+  --ren-radius-sm: 0.25rem;    /* 4px */
+  --ren-radius-md: 0.5rem;     /* 8px */
+  --ren-radius-lg: 1rem;       /* 16px */
+  --ren-radius-full: 9999px;
+
+  /* ====== Shadows ====== */
+
+  --ren-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --ren-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
+  --ren-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.6);
+  --ren-shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.7);
+
+  /* ====== Animation Timings ====== */
+
+  /* Durations */
+  --ren-duration-instant: 100ms;
+  --ren-duration-fast: 200ms;
+  --ren-duration-normal: 300ms;
+  --ren-duration-slow: 500ms;
+  --ren-duration-breath: 3000ms;      /* Breathing animation cycle */
+  --ren-duration-pulse: 1500ms;       /* Listening pulse */
+  --ren-duration-particle: 4000ms;    /* Orbital particle rotation */
+
+  /* Easing functions */
+  --ren-ease-linear: linear;
+  --ren-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ren-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ren-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ren-ease-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ren-ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* ====== Z-index Layers ====== */
+
+  --ren-z-base: 0;
+  --ren-z-dropdown: 1000;
+  --ren-z-overlay: 2000;
+  --ren-z-modal: 3000;
+  --ren-z-toast: 4000;
+  --ren-z-tooltip: 5000;
+
+  /* ====== Orb Specific ====== */
+
+  /* Orb sizes */
+  --ren-orb-size-idle: 80px;
+  --ren-orb-size-active: 100px;
+
+  /* Particle orbit radius */
+  --ren-particle-orbit-radius: 60px;
+
+  /* Waveform bar count */
+  --ren-waveform-bars: 24;
+}
