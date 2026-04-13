@@ -1,16 +1,11 @@
 [package]
 name = "ren"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Ren — fully local, voice-first personal assistant for Windows"
+authors = ["Ren Contributors"]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [lib]
-# The `_lib` suffix may seem redundant but it is necessary
-# to make the lib name unique and wouldn't conflict with the bin name.
-# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "ren_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
@@ -18,8 +13,68 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# Tauri core
+tauri               = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
 
+# Serialization
+serde               = { version = "1", features = ["derive"] }
+serde_json          = "1"
+
+# Async runtime
+tokio               = { version = "1", features = ["full"] }
+
+# Audio capture (microphone input via WASAPI on Windows)
+cpal                = "0.15"
+
+# Voice activity detection
+voice_activity_detector = "0.1"
+
+# Speech-to-text (whisper.cpp bindings)
+# Optional: only links native whisper.cpp when "stt" feature enabled.
+# Allows compilation on machines without whisper.cpp built.
+whisper-rs          = { version = "0.13", optional = true }
+
+# Global hotkey (Ctrl+Alt+R push-to-talk)
+global-hotkey       = "0.6"
+
+# HTTP client (model downloads, Ollama API, web search)
+reqwest             = { version = "0.12", features = ["json", "stream"] }
+
+# Hashing for download verification
+sha2                = "0.10"
+hex                 = "0.4"
+
+# User data directory (%APPDATA%\Ren\)
+directories         = "5"
+
+# Structured logging
+tracing             = "0.1"
+tracing-subscriber  = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Error handling
+anyhow              = "1"
+thiserror           = "2"
+
+# Async stream utilities
+futures             = "0.3"
+
+# Async trait support
+async-trait         = "0.1"
+
+# Windows-specific native APIs
+[target.'cfg(windows)'.dependencies]
+windows             = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Security",
+    "Win32_Media_Audio",
+] }
+
+[features]
+default = []
+# Enable real Whisper STT — requires whisper.cpp native build (C++ toolchain + CMake).
+stt = ["whisper-rs"]

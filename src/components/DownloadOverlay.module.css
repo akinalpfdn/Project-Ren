@@ -1,0 +1,49 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--ren-bg-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ren-space-6);
+  z-index: var(--ren-z-modal);
+  padding: var(--ren-space-8);
+}
+
+.title {
+  font-size: var(--ren-text-lg);
+  font-weight: var(--ren-weight-semibold);
+  color: var(--ren-accent-primary);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.step {
+  font-size: var(--ren-text-sm);
+  color: var(--ren-text-secondary);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.barContainer {
+  width: 220px;
+  height: 2px;
+  background: var(--ren-bg-elevated);
+  border-radius: var(--ren-radius-full);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--ren-accent-primary);
+  border-radius: var(--ren-radius-full);
+  box-shadow: var(--ren-glow-subtle);
+  transition: width 300ms var(--ren-ease-out);
+}
+
+.meta {
+  font-size: var(--ren-text-xs);
+  color: var(--ren-text-tertiary);
+  font-family: var(--ren-font-mono);
+}

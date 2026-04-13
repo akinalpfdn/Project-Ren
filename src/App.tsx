@@ -1,28 +1,25 @@
 /**
  * Main App Component
- * Renders the core Ren orb interface
  */
 
-import { useEffect } from 'react';
 import { Orb } from './components/Orb';
 import { StateControls } from './components/StateControls';
+import { Transcript } from './components/Transcript';
+import { DownloadOverlay } from './components/DownloadOverlay';
+import { useRenEvents } from './hooks/useRenEvents';
 import { useRenStore } from './store';
 
 function App() {
-  const { setState, isVisible } = useRenStore();
+  // Subscribe to all Tauri backend events
+  useRenEvents();
 
-  useEffect(() => {
-    // Simulate initialization sequence
-    const timer = setTimeout(() => {
-      setState('sleeping');
-    }, 2000);
+  const isVisible = useRenStore((s) => s.isVisible);
+  const downloadProgress = useRenStore((s) => s.downloadProgress);
 
-    return () => clearTimeout(timer);
-  }, [setState]);
+  if (!isVisible) return null;
 
-  if (!isVisible) {
-    return null;
-  }
+  // Show download overlay during first-run setup
+  if (downloadProgress) return <DownloadOverlay />;
 
   return (
     <div
@@ -36,6 +33,7 @@ function App() {
       }}
     >
       <Orb />
+      <Transcript />
       <StateControls />
     </div>
   );
