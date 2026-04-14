@@ -1,5 +1,5 @@
 # Phase 08 — Assistant Depth
-Status: PENDING (depends on Phase 6 closing; Phase 7 deferred until the core voice loop is physically verified).
+Status: CODE COMPLETE (2026-04-14) — all 6 sub-phases landed; voice-loop acceptance pending physical access.
 
 ## Goal
 Move Ren from "tool dispatcher" to "assistant that knows context". Ren learns who the user is, notices time, can reason over the clipboard / the filesystem / what's happening on screen, and can proactively nudge when asked.

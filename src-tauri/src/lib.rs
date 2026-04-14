@@ -53,13 +53,20 @@ use crate::{
     wake::{porcupine::PorcupineWakeEngine, WakeEngine, WakeEvent, WakeKeyword},
 };
 
-fn build_tool_registry(config: &config::AppConfig) -> Arc<ToolRegistry> {
+fn build_tool_registry(
+    config: &config::AppConfig,
+    timer_registry: tools::remind::SharedTimerRegistry,
+    reminder_store: tools::remind::SharedReminderStore,
+) -> Arc<ToolRegistry> {
     use crate::tools::apps::AppLauncher;
     use crate::tools::files::{ListDir, OpenFolder, ReadText};
     use crate::tools::media::{
         MediaCurrentTrack, MediaNext, MediaPause, MediaPlay, MediaPrevious,
     };
     use crate::tools::memory::{Forget, Remember};
+    use crate::tools::remind::{
+        ReminderCancel, ReminderList, ReminderSet, TimerCancel, TimerList, TimerStart,
+    };
     use crate::tools::steam::SteamLauncher;
     use crate::tools::system::{
         ActiveWindow, LockScreen, ResourceUsage, RestartSystem, RunningApps, ShutdownSystem,
@@ -92,6 +99,12 @@ fn build_tool_registry(config: &config::AppConfig) -> Arc<ToolRegistry> {
     registry.register(Arc::new(TimeUntil));
     registry.register(Arc::new(Remember));
     registry.register(Arc::new(Forget));
+    registry.register(Arc::new(TimerStart { registry: timer_registry.clone() }));
+    registry.register(Arc::new(TimerList  { registry: timer_registry.clone() }));
+    registry.register(Arc::new(TimerCancel { registry: timer_registry }));
+    registry.register(Arc::new(ReminderSet    { store: reminder_store.clone() }));
+    registry.register(Arc::new(ReminderList   { store: reminder_store.clone() }));
+    registry.register(Arc::new(ReminderCancel { store: reminder_store }));
     registry.register(Arc::new(Weather::new(http.clone(), config)));
     registry.register(Arc::new(WebSearch::new(http, config)));
     info!("Registered {} tools", registry.len());
@@ -146,7 +159,17 @@ pub fn run() {
             let state_machine = state::new_shared(app_handle.clone());
             app.manage(state_machine.clone());
 
-            let tool_registry = build_tool_registry(&config);
+            // Proactive scheduling — shared fire channel feeds both timers
+            // (in-memory) and reminders (persisted). `spawn_reminder_fire_loop`
+            // bridges firings into speech + frontend events.
+            let (fire_tx, fire_rx) = tools::remind::fire_channel();
+            let timer_registry = tools::remind::TimerRegistry::new(fire_tx.clone());
+            let reminder_store = tools::remind::ReminderStore::open(fire_tx.clone())
+                .expect("Failed to open reminder store");
+            tools::remind::reminder::spawn_poll_loop(reminder_store.clone());
+
+            let tool_registry =
+                build_tool_registry(&config, timer_registry.clone(), reminder_store.clone());
 
             setup_tray(app)?;
             position_window_bottom_right(&app_handle)?;
@@ -234,6 +257,15 @@ pub fn run() {
                 state_machine.clone(),
                 whisper.clone(),
                 kokoro.clone(),
+            );
+
+            // Proactive-alert consumer — timers and reminders land here and
+            // get narrated through the existing TTS sentence pipeline.
+            spawn_reminder_fire_loop(
+                app_handle.clone(),
+                state_machine.clone(),
+                fire_rx,
+                sentence_tx.clone(),
             );
 
             // Wake event observer — translate `ren://wake` signals into the
@@ -375,6 +407,48 @@ fn spawn_model_unloader(
                 }
                 Ok(_) => {}
                 Err(_) => return,
+            }
+        }
+    });
+}
+
+// ─── Proactive alerts ─────────────────────────────────────────────────────────
+
+/// Bridges `Firing`s from timer / reminder systems into a spoken narration
+/// and a `ren://reminder` frontend event. If Ren was Sleeping we nudge it
+/// awake first so the TTS sentence pipeline actually plays the alert.
+fn spawn_reminder_fire_loop(
+    app: AppHandle,
+    sm: SharedStateMachine,
+    mut fire_rx: tools::remind::FireReceiver,
+    sentence_tx: mpsc::Sender<String>,
+) {
+    tauri::async_runtime::spawn(async move {
+        while let Some(firing) = fire_rx.recv().await {
+            let sentence = match firing.kind {
+                "timer" => format!("Your timer for {} is up, sir.", firing.label),
+                "reminder" => format!("Reminder: {}.", firing.label),
+                _ => format!("Alert: {}.", firing.label),
+            };
+
+            {
+                let mut guard = sm.lock().unwrap();
+                if matches!(guard.current(), RenState::Sleeping) {
+                    guard.force(RenState::Waking);
+                }
+            }
+
+            let _ = app.emit(
+                "ren://reminder",
+                serde_json::json!({
+                    "kind": firing.kind,
+                    "label": firing.label,
+                }),
+            );
+
+            if sentence_tx.send(sentence).await.is_err() {
+                warn!("Reminder sentence channel closed — stopping fire loop");
+                return;
             }
         }
     });

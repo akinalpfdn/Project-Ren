@@ -10,6 +10,7 @@ pub mod files;
 pub mod media;
 pub mod memory;
 pub mod registry;
+pub mod remind;
 pub mod steam;
 pub mod system;
 pub mod time;

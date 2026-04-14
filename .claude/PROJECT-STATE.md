@@ -2,7 +2,7 @@
 Last updated: 2026-04-14 (Phase 2 home-verified; runtime blockers cleared)
 
 ## Active Phase
-**Phase 6** — next up (settings panel / first-run UX per devplan).
+No active code phase. Phase 8 (Assistant Depth) just closed; Phase 6 remote-friendly sub-set is code-complete; Phase 7 (shipping) deferred pending physical voice-loop verification.
 
 ## Phase Files
 | File | Status |
@@ -12,8 +12,9 @@ Last updated: 2026-04-14 (Phase 2 home-verified; runtime blockers cleared)
 | `.claude/phases/PHASE-03-done.md` | CODE COMPLETE (Kokoro wired via `kokoro-tiny`; runtime gated by CUDA backend conflict + physical-mic tests) |
 | `.claude/phases/PHASE-04-done.md` | CODE COMPLETE (wake consumer wired into pipeline; needs Picovoice key + .ppn resources + mic test) |
 | `.claude/phases/PHASE-05-done.md` | CODE COMPLETE (brightness skipped; voice-loop acceptance deferred to physical) |
-| `.claude/phases/PHASE-06-pending.md` | PENDING ← next up |
-| `.claude/phases/PHASE-07-pending.md` | PENDING |
+| `.claude/phases/PHASE-06-pending.md` | PARTIAL (A–D done: CredentialStore, Weather, Media, Settings; Google/Spotify deferred) |
+| `.claude/phases/PHASE-07-pending.md` | PENDING (shipping — unblocks after voice loop is physically verified) |
+| `.claude/phases/PHASE-08-done.md` | CODE COMPLETE (time, clipboard, files, system, memory, timers/reminders) |
 
 ## What Exists in the Repo Right Now
 
