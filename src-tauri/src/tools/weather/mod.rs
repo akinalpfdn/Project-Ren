@@ -1,9 +1,13 @@
-//! `web.weather` — current conditions and today's forecast from Open-Meteo.
+//! `weather.current` — current conditions and today's forecast from Open-Meteo.
 //!
 //! Open-Meteo is free and key-less, which suits Ren's "no cloud subscriptions"
 //! ethos. Location resolution uses Open-Meteo's geocoding endpoint when the
 //! user supplies a place name; when they don't, we fall back to the
 //! `location` field in `AppConfig`.
+//!
+//! Was a `web.*` tool in Phase 5; lifted into its own category in Phase 6 so
+//! the LLM prompt can group "weather" alongside future contextual tools
+//! (calendar, media) without web-fetching tools being lumped in with them.
 
 use std::sync::Arc;
 
@@ -34,7 +38,7 @@ impl Weather {
 #[async_trait]
 impl Tool for Weather {
     fn name(&self) -> &str {
-        "web.weather"
+        "weather.current"
     }
 
     fn description(&self) -> &str {
@@ -235,5 +239,23 @@ fn describe(code: u32) -> &'static str {
         95 => "Thunderstorm",
         96 | 99 => "Thunderstorm with hail",
         _ => "Unknown conditions",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn describe_covers_known_wmo_codes() {
+        assert_eq!(describe(0), "Clear sky");
+        assert_eq!(describe(3), "Overcast");
+        assert_eq!(describe(61), "Rain");
+        assert_eq!(describe(95), "Thunderstorm");
+    }
+
+    #[test]
+    fn describe_falls_back_on_unknown_codes() {
+        assert_eq!(describe(9999), "Unknown conditions");
     }
 }

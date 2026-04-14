@@ -3,10 +3,8 @@
 //! so connection reuse and timeouts are consistent.
 
 pub mod search;
-pub mod weather;
 
 pub use search::WebSearch;
-pub use weather::Weather;
 
 use std::sync::Arc;
 use std::time::Duration;

@@ -56,7 +56,8 @@ fn build_tool_registry(config: &config::AppConfig) -> Arc<ToolRegistry> {
     use crate::tools::files::OpenFolder;
     use crate::tools::steam::SteamLauncher;
     use crate::tools::system::{LockScreen, RestartSystem, ShutdownSystem, VolumeControl};
-    use crate::tools::web::{default_client as web_client, Weather, WebSearch};
+    use crate::tools::weather::Weather;
+    use crate::tools::web::{default_client as web_client, WebSearch};
 
     let http = web_client();
     let mut registry = ToolRegistry::new();

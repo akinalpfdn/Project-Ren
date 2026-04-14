@@ -10,6 +10,7 @@ pub mod files;
 pub mod registry;
 pub mod steam;
 pub mod system;
+pub mod weather;
 pub mod web;
 
 use async_trait::async_trait;
