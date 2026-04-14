@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod audio;
+mod clipboard;
 mod commands;
 mod config;
 mod dismissal;
@@ -114,6 +115,11 @@ pub fn run() {
             let shared_config: config::SharedConfig =
                 Arc::new(Mutex::new(config.clone()));
             app.manage(shared_config.clone());
+
+            // Clipboard "armed context" — set by Ctrl+Shift+Alt+V and consumed
+            // (cleared) on the next user turn.
+            let clipboard_arm = clipboard::new_arm();
+            app.manage(clipboard_arm.clone());
 
             let state_machine = state::new_shared(app_handle.clone());
             app.manage(state_machine.clone());
@@ -275,6 +281,7 @@ pub fn run() {
             commands::get_config,
             commands::save_config,
             commands::open_settings,
+            commands::clear_clipboard_arm,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -528,7 +535,7 @@ async fn handle_vad_event(
 }
 
 async fn handle_hotkey_event(
-    _app: &AppHandle,
+    app: &AppHandle,
     sm: &SharedStateMachine,
     event: HotkeyEvent,
     ptt_active: &mut bool,
@@ -554,6 +561,71 @@ async fn handle_hotkey_event(
         HotkeyEvent::ForceSleep => {
             sm.lock().unwrap().force(RenState::Sleeping);
         }
+        HotkeyEvent::ArmClipboardContext => {
+            arm_clipboard_context(app).await;
+        }
+    }
+}
+
+/// Reads the Windows clipboard on a blocking thread, stores it in the
+/// shared "armed" slot, and tells the frontend to surface a badge. Errors
+/// are logged but never crash the hotkey loop — the user can simply press
+/// the chord again.
+async fn arm_clipboard_context(app: &AppHandle) {
+    let read_result =
+        tokio::task::spawn_blocking(crate::clipboard::read_text).await;
+    let text = match read_result {
+        Ok(Ok(t)) if !t.trim().is_empty() => t,
+        Ok(Ok(_)) => {
+            warn!("Clipboard is empty — nothing to arm");
+            return;
+        }
+        Ok(Err(e)) => {
+            warn!("Clipboard read failed: {}", e);
+            return;
+        }
+        Err(e) => {
+            warn!("Clipboard read task panicked: {}", e);
+            return;
+        }
+    };
+
+    let preview = crate::clipboard::preview_of(&text);
+    if let Some(arm) = app.try_state::<crate::clipboard::SharedClipboardArm>() {
+        *arm.lock().unwrap() = Some(text);
+    } else {
+        warn!("Clipboard arm state not registered — skipping");
+        return;
+    }
+
+    let _ = app.emit(
+        "ren://clipboard-armed",
+        serde_json::json!({ "preview": preview }),
+    );
+    info!("Clipboard context armed ({} chars preview)", preview.chars().count());
+}
+
+/// Drains the shared "armed clipboard" slot. If something is armed, returns
+/// the user transcript wrapped with the captured preamble so the LLM can
+/// clearly see both. Always emits `ren://clipboard-armed` with a `null`
+/// preview so the frontend badge clears.
+fn consume_clipboard_arm(app: &AppHandle, transcript: String) -> String {
+    let armed = match app.try_state::<crate::clipboard::SharedClipboardArm>() {
+        Some(state) => state.lock().unwrap().take(),
+        None => None,
+    };
+
+    let _ = app.emit(
+        "ren://clipboard-armed",
+        serde_json::json!({ "preview": serde_json::Value::Null }),
+    );
+
+    match armed {
+        Some(clip) => format!(
+            "[Clipboard context]\n{}\n\n[User said]\n{}",
+            clip, transcript
+        ),
+        None => transcript,
     }
 }
 
@@ -583,7 +655,9 @@ async fn run_full_turn(
         },
     );
 
-    // Voice dismissal — short-circuit straight to Sleeping.
+    // Voice dismissal — short-circuit straight to Sleeping. Run on the raw
+    // transcript before any clipboard preamble is wrapped around it, so the
+    // dismissal substring match still hits.
     if dismissal::is_dismissal(&transcript) {
         info!("Dismissal phrase detected — returning to Sleeping");
         sm.lock().unwrap().force(RenState::Sleeping);
@@ -596,6 +670,10 @@ async fn run_full_turn(
         sm.lock().unwrap().transition(RenState::Idle).ok();
         return;
     }
+
+    // Drain any armed clipboard preamble — clears the badge on the frontend
+    // either way (so the user is never surprised by stale context).
+    let transcript = consume_clipboard_arm(app, transcript);
 
     let client = default_client();
     let sentence_tx = sentence_tx.clone();

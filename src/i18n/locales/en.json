@@ -92,6 +92,10 @@
   "debug": {
     "state_controls_label": "Debug state transitions"
   },
+  "clipboard": {
+    "armed_label": "Clipboard context armed",
+    "armed_hint": "ESC to dismiss"
+  },
   "tools": {
     "status": {
       "running": "Running",

@@ -1,6 +1,7 @@
 use tauri::{AppHandle, Emitter, Manager};
 use tracing::{info, warn};
 
+use crate::clipboard::SharedClipboardArm;
 use crate::config::{AppConfig, SharedConfig};
 use crate::state::{RenState, SharedStateMachine};
 
@@ -76,6 +77,21 @@ pub fn save_config(
     }
     info!("Config saved via settings panel");
     let _ = app.emit("ren://config-saved", ());
+    Ok(())
+}
+
+/// Drops any armed clipboard preamble. Bound to ESC in the frontend so the
+/// user can change their mind before submitting the next turn.
+#[tauri::command]
+pub fn clear_clipboard_arm(
+    app: AppHandle,
+    arm: tauri::State<'_, SharedClipboardArm>,
+) -> Result<(), String> {
+    *arm.lock().unwrap() = None;
+    let _ = app.emit(
+        "ren://clipboard-armed",
+        serde_json::json!({ "preview": serde_json::Value::Null }),
+    );
     Ok(())
 }
 

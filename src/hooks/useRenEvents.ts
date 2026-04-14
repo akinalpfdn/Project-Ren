@@ -26,6 +26,7 @@ const EVT_WAVEFORM = 'ren://waveform';
 const EVT_TOOL_EXECUTING = 'ren://tool-executing';
 const EVT_TOOL_RESULT = 'ren://tool-result';
 const EVT_OPEN_SETTINGS = 'ren://open-settings';
+const EVT_CLIPBOARD_ARMED = 'ren://clipboard-armed';
 
 export const useRenEvents = () => {
   // Stable action references — Zustand guarantees these are referentially stable,
@@ -37,6 +38,7 @@ export const useRenEvents = () => {
   const setWaveform = useRenStore((s) => s.setWaveform);
   const setToolActivity = useRenStore((s) => s.setToolActivity);
   const setSettingsOpen = useRenStore((s) => s.setSettingsOpen);
+  const setClipboardPreview = useRenStore((s) => s.setClipboardPreview);
 
   const transcriptTimer = useRef<number | null>(null);
   const toolCardTimer = useRef<number | null>(null);
@@ -69,6 +71,7 @@ export const useRenEvents = () => {
         toolExecOff,
         toolResOff,
         settingsOff,
+        clipboardOff,
       ] = await Promise.all([
         listen<StateChangedPayload>(EVT_STATE, (e) => setState(e.payload.state)),
 
@@ -127,6 +130,10 @@ export const useRenEvents = () => {
         }),
 
         listen(EVT_OPEN_SETTINGS, () => setSettingsOpen(true)),
+
+        listen<{ preview: string | null }>(EVT_CLIPBOARD_ARMED, (e) => {
+          setClipboardPreview(e.payload.preview ?? null);
+        }),
       ]);
 
       // If unmounted while awaiting, drop subscriptions immediately.
@@ -139,6 +146,7 @@ export const useRenEvents = () => {
         toolExecOff();
         toolResOff();
         settingsOff();
+        clipboardOff();
         return;
       }
 
@@ -151,6 +159,7 @@ export const useRenEvents = () => {
         toolExecOff,
         toolResOff,
         settingsOff,
+        clipboardOff,
       );
     };
 
@@ -170,5 +179,6 @@ export const useRenEvents = () => {
     setWaveform,
     setToolActivity,
     setSettingsOpen,
+    setClipboardPreview,
   ]);
 };

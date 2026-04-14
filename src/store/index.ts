@@ -18,6 +18,7 @@ interface RenStore {
   waveformAmplitudes: number[];
   toolActivity: ToolActivity | null;
   settingsOpen: boolean;
+  clipboardPreview: string | null;
 
   setState: (state: RenState) => void;
   setError: (error: ErrorState | null) => void;
@@ -28,6 +29,7 @@ interface RenStore {
   setWaveform: (amplitudes: number[]) => void;
   setToolActivity: (activity: ToolActivity | null) => void;
   setSettingsOpen: (open: boolean) => void;
+  setClipboardPreview: (preview: string | null) => void;
 }
 
 export const useRenStore = create<RenStore>((set) => ({
@@ -39,6 +41,7 @@ export const useRenStore = create<RenStore>((set) => ({
   waveformAmplitudes: Array<number>(WAVEFORM_BAR_COUNT).fill(0),
   toolActivity: null,
   settingsOpen: false,
+  clipboardPreview: null,
 
   setState: (state) => set({ currentState: state, error: null }),
 
@@ -58,4 +61,6 @@ export const useRenStore = create<RenStore>((set) => ({
   setToolActivity: (activity) => set({ toolActivity: activity }),
 
   setSettingsOpen: (open) => set({ settingsOpen: open }),
+
+  setClipboardPreview: (preview) => set({ clipboardPreview: preview }),
 }));

@@ -1,0 +1,46 @@
+.badge {
+  position: fixed;
+  top: var(--ren-space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--ren-z-overlay);
+
+  display: flex;
+  align-items: center;
+  gap: var(--ren-space-3);
+
+  max-width: var(--ren-tool-card-width);
+  padding: var(--ren-space-2) var(--ren-space-4);
+
+  background: var(--ren-bg-elevated);
+  border: 1px solid var(--ren-accent-secondary);
+  border-radius: var(--ren-radius-full);
+  box-shadow: var(--ren-glow-subtle);
+
+  font-family: var(--ren-font-primary);
+  color: var(--ren-text-primary);
+  font-size: var(--ren-text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.label {
+  color: var(--ren-accent-primary);
+  font-weight: var(--ren-weight-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.preview {
+  flex: 1;
+  min-width: 0;
+  color: var(--ren-text-secondary);
+  font-family: var(--ren-font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hint {
+  color: var(--ren-text-tertiary);
+  font-style: italic;
+}
