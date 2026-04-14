@@ -54,7 +54,7 @@ use crate::{
 
 fn build_tool_registry(config: &config::AppConfig) -> Arc<ToolRegistry> {
     use crate::tools::apps::AppLauncher;
-    use crate::tools::files::OpenFolder;
+    use crate::tools::files::{ListDir, OpenFolder, ReadText};
     use crate::tools::media::{
         MediaCurrentTrack, MediaNext, MediaPause, MediaPlay, MediaPrevious,
     };
@@ -73,6 +73,8 @@ fn build_tool_registry(config: &config::AppConfig) -> Arc<ToolRegistry> {
     registry.register(Arc::new(AppLauncher::new()));
     registry.register(Arc::new(SteamLauncher::new()));
     registry.register(Arc::new(OpenFolder));
+    registry.register(Arc::new(ListDir));
+    registry.register(Arc::new(ReadText));
     registry.register(Arc::new(MediaPlay));
     registry.register(Arc::new(MediaPause));
     registry.register(Arc::new(MediaNext));
