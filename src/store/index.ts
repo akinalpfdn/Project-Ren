@@ -17,6 +17,7 @@ interface RenStore {
   downloadProgress: DownloadProgress | null;
   waveformAmplitudes: number[];
   toolActivity: ToolActivity | null;
+  settingsOpen: boolean;
 
   setState: (state: RenState) => void;
   setError: (error: ErrorState | null) => void;
@@ -26,6 +27,7 @@ interface RenStore {
   setDownloadProgress: (progress: DownloadProgress | null) => void;
   setWaveform: (amplitudes: number[]) => void;
   setToolActivity: (activity: ToolActivity | null) => void;
+  setSettingsOpen: (open: boolean) => void;
 }
 
 export const useRenStore = create<RenStore>((set) => ({
@@ -36,6 +38,7 @@ export const useRenStore = create<RenStore>((set) => ({
   downloadProgress: null,
   waveformAmplitudes: Array<number>(WAVEFORM_BAR_COUNT).fill(0),
   toolActivity: null,
+  settingsOpen: false,
 
   setState: (state) => set({ currentState: state, error: null }),
 
@@ -53,4 +56,6 @@ export const useRenStore = create<RenStore>((set) => ({
   setWaveform: (amplitudes) => set({ waveformAmplitudes: amplitudes }),
 
   setToolActivity: (activity) => set({ toolActivity: activity }),
+
+  setSettingsOpen: (open) => set({ settingsOpen: open }),
 }));

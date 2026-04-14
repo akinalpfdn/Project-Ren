@@ -25,6 +25,7 @@ const EVT_ERROR = 'ren://error';
 const EVT_WAVEFORM = 'ren://waveform';
 const EVT_TOOL_EXECUTING = 'ren://tool-executing';
 const EVT_TOOL_RESULT = 'ren://tool-result';
+const EVT_OPEN_SETTINGS = 'ren://open-settings';
 
 export const useRenEvents = () => {
   // Stable action references — Zustand guarantees these are referentially stable,
@@ -35,6 +36,7 @@ export const useRenEvents = () => {
   const setDownloadProgress = useRenStore((s) => s.setDownloadProgress);
   const setWaveform = useRenStore((s) => s.setWaveform);
   const setToolActivity = useRenStore((s) => s.setToolActivity);
+  const setSettingsOpen = useRenStore((s) => s.setSettingsOpen);
 
   const transcriptTimer = useRef<number | null>(null);
   const toolCardTimer = useRef<number | null>(null);
@@ -58,7 +60,16 @@ export const useRenEvents = () => {
     };
 
     const setup = async () => {
-      const [stateOff, transcriptOff, downloadOff, errorOff, waveOff, toolExecOff, toolResOff] = await Promise.all([
+      const [
+        stateOff,
+        transcriptOff,
+        downloadOff,
+        errorOff,
+        waveOff,
+        toolExecOff,
+        toolResOff,
+        settingsOff,
+      ] = await Promise.all([
         listen<StateChangedPayload>(EVT_STATE, (e) => setState(e.payload.state)),
 
         listen<TranscriptPayload>(EVT_TRANSCRIPT, (e) => {
@@ -114,6 +125,8 @@ export const useRenEvents = () => {
             toolCardTimer.current = null;
           }, TOOL_CARD_VISIBLE_MS);
         }),
+
+        listen(EVT_OPEN_SETTINGS, () => setSettingsOpen(true)),
       ]);
 
       // If unmounted while awaiting, drop subscriptions immediately.
@@ -125,10 +138,20 @@ export const useRenEvents = () => {
         waveOff();
         toolExecOff();
         toolResOff();
+        settingsOff();
         return;
       }
 
-      unlisten.push(stateOff, transcriptOff, downloadOff, errorOff, waveOff, toolExecOff, toolResOff);
+      unlisten.push(
+        stateOff,
+        transcriptOff,
+        downloadOff,
+        errorOff,
+        waveOff,
+        toolExecOff,
+        toolResOff,
+        settingsOff,
+      );
     };
 
     setup();
@@ -139,5 +162,13 @@ export const useRenEvents = () => {
       clearToolCardTimer();
       unlisten.forEach((off) => off());
     };
-  }, [setState, setError, setTranscript, setDownloadProgress, setWaveform, setToolActivity]);
+  }, [
+    setState,
+    setError,
+    setTranscript,
+    setDownloadProgress,
+    setWaveform,
+    setToolActivity,
+    setSettingsOpen,
+  ]);
 };

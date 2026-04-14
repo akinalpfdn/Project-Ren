@@ -26,10 +26,53 @@
   },
   "settings": {
     "title": "Settings",
-    "microphone": "Microphone",
-    "wake_sensitivity": "Wake Word Sensitivity",
-    "autostart": "Start with Windows",
-    "api_connections": "API Connections"
+    "close": "Close",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "cancel": "Cancel",
+    "restore_defaults": "Restore defaults",
+    "sections": {
+      "voice": "Voice",
+      "conversation": "Conversation",
+      "location": "Location & weather",
+      "apis": "API keys",
+      "system": "System"
+    },
+    "fields": {
+      "wake_sensitivity": {
+        "label": "Wake word sensitivity",
+        "help": "Higher values trigger more easily but increase false positives (0.0–1.0)."
+      },
+      "conversation_timeout": {
+        "label": "Idle timeout (seconds)",
+        "help": "How long Ren waits in Idle before going back to Sleeping."
+      },
+      "tts_voice": {
+        "label": "Voice",
+        "help": "Kokoro voice identifier (e.g. bf_emma, am_adam)."
+      },
+      "location": {
+        "label": "Default location",
+        "placeholder": "e.g. Istanbul",
+        "help": "Used when the user asks about weather without naming a city."
+      },
+      "brave_api_key": {
+        "label": "Brave Search API key",
+        "placeholder": "sk-…",
+        "help": "Required for web search. Free tier available at brave.com/search/api."
+      },
+      "autostart": {
+        "label": "Start with Windows",
+        "help": "Launch Ren automatically when you sign in."
+      }
+    },
+    "soon": {
+      "title": "Coming later",
+      "body": "Spotify and Google Calendar connections land after the core voice loop is stable."
+    },
+    "load_failed": "Could not load current settings.",
+    "save_failed": "Could not save settings."
   },
   "welcome": {
     "title": "Welcome to Ren",
@@ -63,8 +106,13 @@
       "apps.launch": "Launch app",
       "steam.launch": "Launch Steam game",
       "files.open_folder": "Open folder",
-      "web.weather": "Weather",
-      "web.search": "Web search"
+      "weather.current": "Weather",
+      "web.search": "Web search",
+      "media.play": "Resume playback",
+      "media.pause": "Pause playback",
+      "media.next": "Next track",
+      "media.previous": "Previous track",
+      "media.current_track": "Current track"
     },
     "fallback_name": "Tool"
   }

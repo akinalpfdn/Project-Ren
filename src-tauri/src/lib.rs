@@ -108,6 +108,9 @@ pub fn run() {
                 warn!("Config load failed ({}), using defaults", e);
                 config::AppConfig::default()
             });
+            let shared_config: config::SharedConfig =
+                Arc::new(Mutex::new(config.clone()));
+            app.manage(shared_config.clone());
 
             let state_machine = state::new_shared(app_handle.clone());
             app.manage(state_machine.clone());
@@ -266,6 +269,9 @@ pub fn run() {
             commands::show_window,
             commands::hide_window,
             commands::get_state,
+            commands::get_config,
+            commands::save_config,
+            commands::open_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -709,8 +715,9 @@ async fn tts_sentence_loop(
 
 fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let show_hide = MenuItem::with_id(app, "show_hide", "Show Ren", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show_hide, &quit])?;
+    let menu = Menu::with_items(app, &[&show_hide, &settings, &quit])?;
 
     TrayIconBuilder::new()
         .menu(&menu)
@@ -718,6 +725,7 @@ fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .tooltip("Ren")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show_hide" => { let _ = commands::toggle_window(app.clone()); }
+            "settings"  => { let _ = commands::open_settings(app.clone()); }
             "quit"      => { app.exit(0); }
             _           => {}
         })

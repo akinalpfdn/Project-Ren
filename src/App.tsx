@@ -7,6 +7,7 @@ import { Orb } from './components/Orb';
 import { Transcript } from './components/Transcript';
 import { ToolCard } from './components/ToolCard';
 import { DownloadOverlay } from './components/DownloadOverlay';
+import { Settings } from './components/Settings';
 import { useRenEvents } from './hooks/useRenEvents';
 import { useRenStore } from './store';
 import styles from './App.module.css';
@@ -25,6 +26,7 @@ const App = () => {
       <ToolCard />
       <Orb />
       <Transcript />
+      <Settings />
     </main>
   );
 };

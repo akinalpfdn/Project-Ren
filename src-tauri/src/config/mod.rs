@@ -1,6 +1,7 @@
 pub mod defaults;
 
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
 use directories::BaseDirs;
@@ -8,6 +9,11 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use defaults::*;
+
+/// Shared, mutable config handle managed as Tauri state so the settings
+/// panel can read the current snapshot and persist edits without every
+/// subsystem having to carry its own reference.
+pub type SharedConfig = Arc<Mutex<AppConfig>>;
 
 /// Runtime application configuration.
 /// Persisted to `%APPDATA%\Ren\config.json`.
