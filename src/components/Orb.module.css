@@ -17,15 +17,12 @@
   position: relative;
   width: var(--ren-orb-size-idle);
   height: var(--ren-orb-size-idle);
-  border-radius: var(--ren-radius-full);
-  box-shadow: var(--ren-glow-idle);
   pointer-events: auto;
   cursor: grab;
   touch-action: none;
   transition:
     width var(--ren-duration-normal) var(--ren-ease-smooth),
     height var(--ren-duration-normal) var(--ren-ease-smooth),
-    box-shadow var(--ren-duration-normal) var(--ren-ease-smooth),
     opacity var(--ren-duration-normal) var(--ren-ease-smooth);
 }
 
@@ -35,9 +32,9 @@
 
 .core {
   position: absolute;
-  inset: -10%;
-  width: 120%;
-  height: 120%;
+  inset: -52%;
+  width: 204%;
+  height: 204%;
   overflow: visible;
   pointer-events: none;
   animation: coreSwirl 22s linear infinite;
@@ -58,8 +55,6 @@
 
 .orb.sleeping {
   opacity: var(--ren-orb-sleeping-opacity);
-  border-color: var(--ren-accent-tertiary);
-  box-shadow: var(--ren-glow-subtle);
 }
 
 /* ===== State: Initializing ===== */
@@ -89,12 +84,10 @@
   0%,
   100% {
     transform: scale(1);
-    box-shadow: var(--ren-glow-idle);
     opacity: 0.9;
   }
   50% {
     transform: scale(1.05);
-    box-shadow: var(--ren-glow-listening);
     opacity: 1;
   }
 }
@@ -102,8 +95,6 @@
 /* ===== State: Waking ===== */
 
 .orb.waking {
-  border-color: var(--ren-accent-primary);
-  box-shadow: var(--ren-glow-listening);
   animation: wake var(--ren-duration-slow) var(--ren-ease-bounce);
 }
 
@@ -111,17 +102,14 @@
   0% {
     transform: scale(0.6);
     opacity: var(--ren-orb-sleeping-opacity);
-    box-shadow: var(--ren-glow-subtle);
   }
   60% {
     transform: scale(var(--ren-orb-wake-overshoot));
     opacity: 1;
-    box-shadow: var(--ren-glow-speaking);
   }
   100% {
     transform: scale(1);
     opacity: 1;
-    box-shadow: var(--ren-glow-listening);
   }
 }
 
@@ -130,8 +118,6 @@
 .orb.listening {
   width: var(--ren-orb-size-active);
   height: var(--ren-orb-size-active);
-  background: var(--ren-gradient-radial-intense);
-  box-shadow: var(--ren-glow-listening);
   animation: pulse var(--ren-duration-pulse) var(--ren-ease-in-out) infinite;
 }
 
@@ -148,7 +134,6 @@
 /* ===== State: Thinking — Orbital particles ===== */
 
 .orb.thinking {
-  box-shadow: var(--ren-glow-thinking);
 }
 
 .particles {
@@ -167,7 +152,6 @@
   margin-top: calc(var(--ren-particle-size) / -2);
   background: var(--ren-accent-primary);
   border-radius: var(--ren-radius-full);
-  box-shadow: var(--ren-glow-subtle);
   animation: orbit var(--ren-duration-particle) var(--ren-ease-linear) infinite;
 }
 
@@ -196,7 +180,6 @@
 /* ===== State: Speaking — Data-driven waveform ===== */
 
 .orb.speaking {
-  box-shadow: var(--ren-glow-speaking);
 }
 
 .waveform {
@@ -218,7 +201,6 @@
   height: 100%;
   background: var(--ren-accent-primary);
   border-radius: var(--ren-radius-sm);
-  box-shadow: var(--ren-glow-subtle);
   transform-origin: center;
   transition: transform var(--ren-duration-fast) var(--ren-ease-out);
 }
@@ -226,8 +208,6 @@
 /* ===== State: Error ===== */
 
 .orb.error {
-  border-color: var(--ren-state-error);
-  box-shadow: var(--ren-glow-error);
   animation: shake var(--ren-duration-fast) var(--ren-ease-in-out);
 }
 
