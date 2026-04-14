@@ -44,6 +44,10 @@ pub struct AppConfig {
 
     // System
     pub autostart: bool,
+
+    // Memory (Phase 8.5)
+    pub memory_enabled: bool,
+    pub memory_archive_retention_days: u32,
 }
 
 impl Default for AppConfig {
@@ -59,6 +63,8 @@ impl Default for AppConfig {
             brave_api_key: None,
             location: None,
             autostart: false,
+            memory_enabled: true,
+            memory_archive_retention_days: 30,
         }
     }
 }

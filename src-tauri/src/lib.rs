@@ -9,6 +9,7 @@ mod dismissal;
 mod download;
 mod hotkey;
 mod llm;
+mod memory;
 mod playback;
 mod state;
 mod storage;
@@ -58,6 +59,7 @@ fn build_tool_registry(config: &config::AppConfig) -> Arc<ToolRegistry> {
     use crate::tools::media::{
         MediaCurrentTrack, MediaNext, MediaPause, MediaPlay, MediaPrevious,
     };
+    use crate::tools::memory::{Forget, Remember};
     use crate::tools::steam::SteamLauncher;
     use crate::tools::system::{
         ActiveWindow, LockScreen, ResourceUsage, RestartSystem, RunningApps, ShutdownSystem,
@@ -88,6 +90,8 @@ fn build_tool_registry(config: &config::AppConfig) -> Arc<ToolRegistry> {
     registry.register(Arc::new(MediaCurrentTrack));
     registry.register(Arc::new(TimeNow));
     registry.register(Arc::new(TimeUntil));
+    registry.register(Arc::new(Remember));
+    registry.register(Arc::new(Forget));
     registry.register(Arc::new(Weather::new(http.clone(), config)));
     registry.register(Arc::new(WebSearch::new(http, config)));
     info!("Registered {} tools", registry.len());
@@ -128,6 +132,16 @@ pub fn run() {
             // (cleared) on the next user turn.
             let clipboard_arm = clipboard::new_arm();
             app.manage(clipboard_arm.clone());
+
+            // One-shot archive prune at startup. Best-effort; logs on failure.
+            if config.memory_enabled {
+                let retention = config.memory_archive_retention_days;
+                tauri::async_runtime::spawn_blocking(move || {
+                    if let Ok(store) = memory::MemoryStore::open() {
+                        store.prune_archive(retention);
+                    }
+                });
+            }
 
             let state_machine = state::new_shared(app_handle.clone());
             app.manage(state_machine.clone());
@@ -679,6 +693,11 @@ async fn run_full_turn(
         return;
     }
 
+    // Archive the *raw* user transcript before any clipboard wrap so we
+    // never write pasted content (potentially sensitive) to long-term
+    // storage. Best-effort — internal logging on failure.
+    archive_user_turn(&transcript);
+
     // Drain any armed clipboard preamble — clears the badge on the frontend
     // either way (so the user is never surprised by stale context).
     let transcript = consume_clipboard_arm(app, transcript);
@@ -704,11 +723,35 @@ async fn run_full_turn(
         )
         .await;
 
-        if let Err(e) = result {
-            sm_clone
-                .lock()
-                .unwrap()
-                .emit_error("llm_failed", &e.to_string());
+        match result {
+            Ok(reply) if !reply.trim().is_empty() => {
+                archive_assistant_turn(&reply);
+            }
+            Ok(_) => {}
+            Err(e) => {
+                sm_clone
+                    .lock()
+                    .unwrap()
+                    .emit_error("llm_failed", &e.to_string());
+            }
+        }
+    });
+}
+
+fn archive_user_turn(text: &str) {
+    let text = text.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Ok(store) = crate::memory::MemoryStore::open() {
+            store.archive_turn(crate::memory::ArchiveRole::User, &text);
+        }
+    });
+}
+
+fn archive_assistant_turn(text: &str) {
+    let text = text.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Ok(store) = crate::memory::MemoryStore::open() {
+            store.archive_turn(crate::memory::ArchiveRole::Assistant, &text);
         }
     });
 }

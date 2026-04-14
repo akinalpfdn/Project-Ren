@@ -1,10 +1,19 @@
+use tracing::warn;
+
+use crate::memory::{prompt_block, MemoryStore};
 use crate::tools::time::current_prompt_stamp;
 use crate::tools::{ToolRegistry, ToolSafety};
+
+/// How many recent archive entries the prompt is allowed to carry.
+const RECENT_ARCHIVE_ENTRIES: usize = 8;
 
 /// Builds the system prompt injected at the start of every conversation.
 ///
 /// - Stamps the current local time so the model does not have to guess what
 ///   "today" or "this morning" means.
+/// - Loads the persistent profile and a short archive tail (Phase 8.5) so
+///   the model has continuity across sessions. Failures here are non-fatal —
+///   we just skip the memory block and log a warning.
 /// - Appends the tool catalogue (name + safety tier) when a registry is
 ///   provided so the LLM knows which names it may call and which ones
 ///   require a spoken confirmation.
@@ -13,6 +22,21 @@ pub fn build_system_prompt(registry: Option<&ToolRegistry>) -> String {
 
     prompt.push_str("\n\n");
     prompt.push_str(&current_prompt_stamp());
+
+    match MemoryStore::open() {
+        Ok(store) => {
+            let profile = store.load_profile().unwrap_or_default();
+            let recent = store.recent_entries(RECENT_ARCHIVE_ENTRIES);
+            let block = prompt_block(&profile, &recent);
+            if !block.is_empty() {
+                prompt.push_str("\n\n");
+                prompt.push_str(block.trim_end());
+            }
+        }
+        Err(e) => {
+            warn!("Memory store unavailable for prompt build: {}", e);
+        }
+    }
 
     if let Some(reg) = registry {
         let safety = reg.safety_map();
