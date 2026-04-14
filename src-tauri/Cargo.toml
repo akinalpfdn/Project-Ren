@@ -65,6 +65,9 @@ async-trait         = "0.1"
 # Base64 for DPAPI-encrypted credential envelopes.
 base64              = "0.22"
 
+# Local date/time + parsing for the time tools and reminder scheduling.
+chrono              = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+
 # Audio playback (TTS output)
 rodio               = "0.19"
 

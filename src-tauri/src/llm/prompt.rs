@@ -1,11 +1,18 @@
+use crate::tools::time::current_prompt_stamp;
 use crate::tools::{ToolRegistry, ToolSafety};
 
 /// Builds the system prompt injected at the start of every conversation.
-/// When a `ToolRegistry` is provided, the list of available tools is
-/// appended so the LLM knows which names it may call and which ones
-/// require a spoken confirmation.
+///
+/// - Stamps the current local time so the model does not have to guess what
+///   "today" or "this morning" means.
+/// - Appends the tool catalogue (name + safety tier) when a registry is
+///   provided so the LLM knows which names it may call and which ones
+///   require a spoken confirmation.
 pub fn build_system_prompt(registry: Option<&ToolRegistry>) -> String {
     let mut prompt = SYSTEM_PROMPT_BASE.trim().to_string();
+
+    prompt.push_str("\n\n");
+    prompt.push_str(&current_prompt_stamp());
 
     if let Some(reg) = registry {
         let safety = reg.safety_map();

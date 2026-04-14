@@ -59,6 +59,7 @@ fn build_tool_registry(config: &config::AppConfig) -> Arc<ToolRegistry> {
     };
     use crate::tools::steam::SteamLauncher;
     use crate::tools::system::{LockScreen, RestartSystem, ShutdownSystem, VolumeControl};
+    use crate::tools::time::{TimeNow, TimeUntil};
     use crate::tools::weather::Weather;
     use crate::tools::web::{default_client as web_client, WebSearch};
 
@@ -76,6 +77,8 @@ fn build_tool_registry(config: &config::AppConfig) -> Arc<ToolRegistry> {
     registry.register(Arc::new(MediaNext));
     registry.register(Arc::new(MediaPrevious));
     registry.register(Arc::new(MediaCurrentTrack));
+    registry.register(Arc::new(TimeNow));
+    registry.register(Arc::new(TimeUntil));
     registry.register(Arc::new(Weather::new(http.clone(), config)));
     registry.register(Arc::new(WebSearch::new(http, config)));
     info!("Registered {} tools", registry.len());

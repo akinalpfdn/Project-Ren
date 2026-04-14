@@ -11,6 +11,7 @@ pub mod media;
 pub mod registry;
 pub mod steam;
 pub mod system;
+pub mod time;
 pub mod weather;
 pub mod web;
 
