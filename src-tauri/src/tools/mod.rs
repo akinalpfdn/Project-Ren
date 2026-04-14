@@ -7,6 +7,7 @@
 
 pub mod apps;
 pub mod files;
+pub mod media;
 pub mod registry;
 pub mod steam;
 pub mod system;
