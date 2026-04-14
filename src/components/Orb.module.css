@@ -21,12 +21,19 @@
   background: var(--ren-gradient-radial-primary);
   border: 1px solid var(--ren-accent-primary);
   box-shadow: var(--ren-glow-idle);
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
   transition:
     width var(--ren-duration-normal) var(--ren-ease-smooth),
     height var(--ren-duration-normal) var(--ren-ease-smooth),
     box-shadow var(--ren-duration-normal) var(--ren-ease-smooth),
     border-color var(--ren-duration-normal) var(--ren-ease-smooth),
     opacity var(--ren-duration-normal) var(--ren-ease-smooth);
+}
+
+.orb:active {
+  cursor: grabbing;
 }
 
 /* ===== State: Sleeping ===== */

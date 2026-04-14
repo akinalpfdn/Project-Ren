@@ -314,6 +314,9 @@ pub fn run() {
 
             // Clean up Ollama on app exit (attach to main window)
             if let Some(window) = app.get_webview_window("main") {
+                // Force WebView2 to use a transparent backbuffer so the
+                // window is truly see-through on Windows.
+                let _ = window.set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));
                 let ollama_on_exit = ollama_child.clone();
                 window.on_window_event(move |event| {
                     if matches!(event, tauri::WindowEvent::Destroyed) {

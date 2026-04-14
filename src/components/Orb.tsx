@@ -58,6 +58,7 @@ export const Orb = () => {
   return (
     <div className={styles.container}>
       <motion.div
+        data-tauri-drag-region
         className={`${styles.orb} ${styles[currentState]}`}
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
