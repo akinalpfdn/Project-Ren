@@ -28,6 +28,7 @@ pub const OLLAMA_PINNED_VERSION: &str = "0.9.0";
 // Models
 pub const WHISPER_MODEL_FILENAME: &str = "ggml-large-v3.bin";
 pub const KOKORO_MODEL_FILENAME: &str = "kokoro.onnx";
+pub const KOKORO_VOICES_FILENAME: &str = "voices-v1.0.bin";
 
 // TTS
 pub const TTS_DEFAULT_VOICE: &str = "bf_emma";

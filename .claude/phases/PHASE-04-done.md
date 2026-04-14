@@ -95,13 +95,27 @@ Adding a third observer (e.g. wake-engine load/unload) is now a one-function cha
 ---
 
 ## Acceptance Criteria
-- [ ] Saying "Ren" or "Hey Ren" from across the room reliably wakes the assistant — *requires Porcupine runtime, deferred to home.*
-- [ ] Models load in parallel with the wake animation so there's no noticeable delay — *deferred to home.*
+- [ ] Saying "Ren" or "Hey Ren" from across the room reliably wakes the assistant — *pipeline wired (see below), **needs physical mic test + PICOVOICE_ACCESS_KEY + .ppn files.***
+- [ ] Models load in parallel with the wake animation so there's no noticeable delay — *needs physical test.*
 - [x] State machine supports a follow-up turn without re-triggering the wake word (Idle → Listening edge added).
 - [x] Idle timeout returns to sleep after the configurable duration (`spawn_conversation_timer`).
 - [x] Voice dismissal works (`dismissal::is_dismissal`, 4 unit tests).
-- [ ] False positive rate on the wake word is acceptable — *measure at home.*
+- [ ] False positive rate on the wake word is acceptable — *needs physical 10-minute podcast/call sanity check.*
 - [x] StateControls debug UI is gone.
+
+### Wake consumer wiring — code complete (2026-04-14)
+- `src/audio/wake_consumer.rs` — buffers f32 frames, quantises to i16, feeds the engine in exact `frame_length()` chunks, and only processes while `RenState::Sleeping`.
+- `src/audio/mod.rs` — pipeline now fans out capture frames to VAD *and* (optionally) the wake consumer. Falls back to VAD-only when wake is disabled.
+- `src/lib.rs` — `build_wake_engine` resolves `.ppn` files under the Tauri resource dir, checks the compile-time access key, and returns `None` with a `warn!` if anything is missing (hotkey-only mode). `preload_wake_engine` loads asynchronously. `spawn_wake_event_observer` walks `Sleeping → Waking → Listening` on detected wake events. `wake_ack.wav` playback is flagged with a `TODO(phase-4-home)` until the asset lands.
+- `cargo check` (no features) — ✅ clean.
+
+### Remaining home-only work
+1. **Picovoice setup** — create a free-tier account at `console.picovoice.ai`, copy the access key, `setx PICOVOICE_ACCESS_KEY "<key>"`, and restart the shell so `option_env!` picks it up.
+2. **Train the two keywords** — `Hey Ren` → `hey_ren_en_windows.ppn`, `Ren uyan` → `ren_uyan_en_windows.ppn`.
+3. **Bundle the resources** — place both files under `src-tauri/resources/wake/` and register them in `tauri.conf.json` under `bundle.resources`.
+4. **Record/place `wake_ack.wav`** under `src-tauri/resources/` and extend `AudioPlayer` with a `play_file` helper; wire into `spawn_wake_event_observer`.
+5. **Run the voice loop** — say "Hey Ren" across the room, confirm the Sleeping → Waking → Listening walk in logs and the orb animation.
+6. **False-positive sanity test** — play a 10-minute podcast / phone call near the mic. If more than 1–2 false wakes occur, lower `WAKE_WORD_SENSITIVITY` from `0.5` to `0.4`.
 
 ## Decisions Made This Phase
 - Wake engine is trait-based + feature-gated, mirroring the `stt`/`tts` pattern. Keeps the work-machine compile path clean.

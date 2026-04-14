@@ -9,8 +9,8 @@ Last updated: 2026-04-14 (Phase 2 home-verified; runtime blockers cleared)
 |------|--------|
 | `.claude/phases/PHASE-01-done.md` | DONE |
 | `.claude/phases/PHASE-02-done.md` | DONE (home-verified: CUDA Whisper end-to-end Turkish) |
-| `.claude/phases/PHASE-03-done.md` | DONE (home: Ollama runtime + Kokoro ORT inference) |
-| `.claude/phases/PHASE-04-done.md` | DONE (home: Picovoice key + .ppn files) |
+| `.claude/phases/PHASE-03-done.md` | CODE COMPLETE (Kokoro wired via `kokoro-tiny`; runtime gated by CUDA backend conflict + physical-mic tests) |
+| `.claude/phases/PHASE-04-done.md` | CODE COMPLETE (wake consumer wired into pipeline; needs Picovoice key + .ppn resources + mic test) |
 | `.claude/phases/PHASE-05-active.md` | ACTIVE ← you are here |
 | `.claude/phases/PHASE-06-pending.md` | PENDING |
 | `.claude/phases/PHASE-07-pending.md` | PENDING |
@@ -76,7 +76,7 @@ Last updated: 2026-04-14 (Phase 2 home-verified; runtime blockers cleared)
 - `cargo check --features wake` → needs Picovoice native lib + access key → home
 
 ## What's Needed at Home
-- **Phase 3**: Download Ollama binary + Kokoro ONNX, implement `KokoroEngine::synthesize()` ORT inference, full voice loop test.
+- **Phase 3 (physical access required)**: Resolve ORT/whisper.cpp CUDA-context conflict, measure time-to-first-audio, orphan-process + port-conflict tests.
 - **Phase 4**: Picovoice access key (`PICOVOICE_ACCESS_KEY` env var), train + bundle the two `.ppn` files, wire wake-engine consumer task into the audio pipeline, false-positive sanity check.
 
 ## What Phase 5 Starts With

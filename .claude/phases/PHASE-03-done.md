@@ -91,11 +91,20 @@ cargo build --features stt,tts
 
 ## Acceptance Criteria
 - [ ] Ren downloads the Ollama binary — *deferred to the Phase 7 first-run wizard.*
-- [ ] Ollama child starts on a custom port — *Rust complete; verify at home.*
-- [ ] Ren responds to Turkish speech with English speech — *verify at home (Kokoro `synthesize` TODO outstanding).*
+- [x] Ollama child starts on a custom port — *verified: Ren spawns Ollama on 11500, log confirms `"Ollama ready on port 11500"`.*
+- [x] `KokoroEngine::synthesize()` implemented — *wraps `kokoro-tiny` 0.1 (espeak-rs phonemizer + ORT inference + voice embeddings); compiles clean with `--features tts`.*
+- [ ] Ren responds to Turkish speech with English speech — *blocked: remote-session limitation + ORT-CUDA vs whisper.cpp-CUDA conflict triggering `STATUS_STACK_BUFFER_OVERRUN` on Whisper model load. **NEEDS PHYSICAL ACCESS + CUDA-sharing fix.***
 - [x] Personality is consistent — *system prompt written.*
-- [ ] Time-to-first-audio under 2 s — *measure at home.*
+- [ ] Time-to-first-audio under 2 s — *measure at home after CUDA conflict resolved.*
 - [x] Conversation history works — *`Conversation` struct in place.*
-- [ ] Killing Ren terminates Ollama — *Job Object code complete; verify at home.*
+- [ ] Killing Ren terminates Ollama — *Job Object code complete; **needs physical Task-Manager kill test.***
 - [x] Pre-existing system Ollama does not interfere — *port isolation + `OLLAMA_MODELS` override.*
 - [ ] Downloads are resumable — *Phase 7.*
+
+### Remaining home-only work
+1. **CUDA backend conflict** — ORT (via kokoro-tiny + `download-binaries`) and whisper.cpp both initialize CUDA contexts. Currently triggers a CRT `_osfile(fh) & FOPEN` debug assert followed by stack-buffer-overrun on Whisper load. Options when back on hardware:
+   - Disable kokoro-tiny's `cuda` feature (already attempted — crash persists, so issue is static-link + DllMain init, not runtime usage).
+   - Serialize the two backends: load-unload pattern, or run TTS in a separate process.
+   - Switch Whisper to an ORT-based engine so both share the ORT runtime.
+2. **Orphan-process test** — force-kill Ren from Task Manager, confirm `ollama.exe` dies via Job Object.
+3. **Port-conflict test** — occupy 11500, confirm Ren probes up to 11520.

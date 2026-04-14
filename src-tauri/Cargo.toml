@@ -72,6 +72,10 @@ ort                 = { version = "=2.0.0-rc.10", optional = true }
 # ndarray for audio tensor manipulation
 ndarray             = { version = "0.16", optional = true }
 
+# Kokoro TTS — minimal embedding-focused crate on top of ort + rodio.
+# Gated on the "tts" feature; brings phonemizer + voice embeddings + inference.
+kokoro-tiny         = { version = "0.1", optional = true }
+
 # Sentence splitting for streaming TTS pipeline
 unicode-segmentation = "1"
 
@@ -103,6 +107,6 @@ default = []
 # Enable real Whisper STT — requires whisper.cpp native build (C++ toolchain + CMake).
 stt = ["whisper-rs"]
 # Enable real Kokoro TTS — requires ONNX Runtime native library.
-tts = ["ort", "ndarray"]
+tts = ["ort", "ndarray", "kokoro-tiny"]
 # Enable Porcupine wake word detection — requires Picovoice native library at runtime.
 wake = ["pv_porcupine"]

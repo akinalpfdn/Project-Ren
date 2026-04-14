@@ -39,7 +39,7 @@ type SharedKokoro = Arc<AsyncMutex<KokoroEngine>>;
 use tracing::{info, warn};
 
 use crate::{
-    audio::vad::VadEvent,
+    audio::{vad::VadEvent, WakeHookup},
     hotkey::HotkeyEvent,
     llm::{conversation::Conversation, default_client},
     playback::AudioPlayer,
@@ -47,6 +47,7 @@ use crate::{
     stt::{whisper::WhisperEngine, SttEngine},
     tools::ToolRegistry,
     tts::{kokoro::KokoroEngine, TtsEngine},
+    wake::{porcupine::PorcupineWakeEngine, WakeEngine, WakeEvent, WakeKeyword},
 };
 
 fn build_tool_registry(config: &config::AppConfig) -> Arc<ToolRegistry> {
@@ -110,11 +111,23 @@ pub fn run() {
             let (hotkey_event_tx, hotkey_event_rx) = mpsc::channel::<HotkeyEvent>(16);
             let (sentence_tx, sentence_rx) = mpsc::channel::<String>(32);
             let (llm_token_tx, _llm_token_rx) = mpsc::channel::<String>(256);
+            let (wake_event_tx, wake_event_rx) = mpsc::channel::<WakeEvent>(8);
+
+            // Optional wake-word engine. Returns `None` if the `wake` feature is
+            // off, the Picovoice access key is missing, or the .ppn resources are
+            // not bundled — in any of those cases the audio pipeline falls back
+            // to hotkey-only activation.
+            let wake_engine = build_wake_engine(&app_handle);
+            let wake_hookup = wake_engine.clone().map(|engine| WakeHookup {
+                engine,
+                event_tx: wake_event_tx.clone(),
+                state_machine: state_machine.clone(),
+            });
 
             // Audio pipeline — leaked intentionally so the cpal Stream and VAD task
             // live for the entire process lifetime. Dropping the setup-scope handle
             // would silently stop capture.
-            let audio_stream = audio::start_pipeline(vad_event_tx)
+            let audio_stream = audio::start_pipeline(vad_event_tx, wake_hookup)
                 .expect("Failed to start audio pipeline");
             Box::leak(Box::new(audio_stream));
 
@@ -178,6 +191,21 @@ pub fn run() {
                 whisper.clone(),
                 kokoro.clone(),
             );
+
+            // Wake event observer — translate `ren://wake` signals into the
+            // Sleeping → Waking → Listening state walk and the startup ack chime.
+            if let Some(engine) = wake_engine.clone() {
+                spawn_wake_event_observer(
+                    state_machine.clone(),
+                    wake_event_rx,
+                    app_handle.clone(),
+                );
+                preload_wake_engine(engine);
+            } else {
+                // Keep the receiver alive so the channel never closes; the tx
+                // side in the hookup would never fire but silencing unused warns.
+                drop(wake_event_rx);
+            }
 
             // Main event loop
             let sm = state_machine.clone();
@@ -299,6 +327,116 @@ fn spawn_model_unloader(
                 }
                 Ok(_) => {}
                 Err(_) => return,
+            }
+        }
+    });
+}
+
+// ─── Wake word ───────────────────────────────────────────────────────────────
+
+/// Resolves the Picovoice access key and the bundled `.ppn` resource files
+/// and constructs a Porcupine engine. Returns `None` — with a warn log — if
+/// any ingredient is missing so the rest of the app still boots into a
+/// hotkey-only mode.
+fn build_wake_engine(app: &AppHandle) -> Option<Arc<AsyncMutex<dyn WakeEngine>>> {
+    use crate::config::defaults::{
+        PICOVOICE_ACCESS_KEY, WAKE_KEYWORD_HEY_REN, WAKE_KEYWORD_REN_UYAN,
+        WAKE_WORD_SENSITIVITY,
+    };
+
+    if PICOVOICE_ACCESS_KEY.is_empty() {
+        warn!("PICOVOICE_ACCESS_KEY not set at build time — wake word disabled");
+        return None;
+    }
+
+    let resource_dir = match app.path().resource_dir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            warn!("Could not resolve resource directory ({}); wake word disabled", e);
+            return None;
+        }
+    };
+
+    let wake_dir = resource_dir.join("wake");
+    let keywords = [
+        ("hey_ren", WAKE_KEYWORD_HEY_REN),
+        ("ren_uyan", WAKE_KEYWORD_REN_UYAN),
+    ];
+
+    let mut resolved = Vec::with_capacity(keywords.len());
+    for (id, filename) in keywords {
+        let path = wake_dir.join(filename);
+        if !path.exists() {
+            warn!(
+                "Wake keyword file missing: {} — wake word disabled",
+                path.display()
+            );
+            return None;
+        }
+        let path_str = match path.to_str() {
+            Some(s) => s.to_string(),
+            None => {
+                warn!(
+                    "Wake keyword path contains invalid UTF-8: {}",
+                    path.display()
+                );
+                return None;
+            }
+        };
+        resolved.push(WakeKeyword {
+            id: id.to_string(),
+            model_path: path_str,
+            sensitivity: WAKE_WORD_SENSITIVITY,
+        });
+    }
+
+    let engine = PorcupineWakeEngine::new(PICOVOICE_ACCESS_KEY, resolved);
+    Some(Arc::new(AsyncMutex::new(engine)) as Arc<AsyncMutex<dyn WakeEngine>>)
+}
+
+/// Loads the wake engine on a background task so startup stays responsive.
+fn preload_wake_engine(engine: Arc<AsyncMutex<dyn WakeEngine>>) {
+    tauri::async_runtime::spawn(async move {
+        let mut guard = engine.lock().await;
+        if let Err(e) = guard.load().await {
+            warn!("Wake engine load failed: {}", e);
+        }
+    });
+}
+
+/// Walks Ren through `Sleeping → Waking → Listening` on wake detection.
+/// Wake events that arrive in any other state are logged and ignored.
+fn spawn_wake_event_observer(
+    sm: SharedStateMachine,
+    mut wake_rx: mpsc::Receiver<WakeEvent>,
+    _app: AppHandle,
+) {
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = wake_rx.recv().await {
+            let current = sm.lock().unwrap().current();
+            if !matches!(current, RenState::Sleeping) {
+                info!(
+                    "Wake '{}' ignored — current state {:?}",
+                    event.keyword_id, current
+                );
+                continue;
+            }
+
+            info!("Wake '{}' accepted — transitioning Sleeping → Waking", event.keyword_id);
+            {
+                let mut m = sm.lock().unwrap();
+                m.force(RenState::Waking);
+            }
+
+            // TODO(phase-4-home): decode `wake_ack.wav` from the bundled
+            // resource dir and play it via `AudioPlayer`. Until the asset is
+            // wired we rely on the orb animation for user feedback.
+
+            {
+                let mut m = sm.lock().unwrap();
+                if let Err(e) = m.transition(RenState::Listening) {
+                    warn!("Waking → Listening transition failed: {}", e);
+                }
             }
         }
     });

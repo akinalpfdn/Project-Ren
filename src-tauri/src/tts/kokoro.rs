@@ -2,20 +2,28 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use tracing::info;
 
-use crate::config::{models_dir, defaults::{KOKORO_MODEL_FILENAME, TTS_DEFAULT_VOICE}};
+#[cfg(feature = "tts")]
+use std::sync::{Arc, Mutex};
+
 use super::{AudioBuffer, TtsEngine};
+use crate::config::{
+    defaults::{KOKORO_MODEL_FILENAME, KOKORO_VOICES_FILENAME, TTS_DEFAULT_VOICE},
+    models_dir,
+};
 
 const KOKORO_SAMPLE_RATE: u32 = 24_000;
 
-/// Kokoro TTS engine backed by ONNX Runtime.
+/// Kokoro TTS engine backed by the `kokoro-tiny` crate.
 ///
 /// Feature-gated on `tts` — compiles as a stub on machines without ORT installed.
-/// On a capable machine with `--features tts`, loads `kokoro.onnx` and synthesizes.
+/// On a capable machine with `--features tts`, wraps `kokoro_tiny::TtsEngine`
+/// which bundles espeak-rs for phonemization, ORT-based inference, and
+/// precomputed voice style embeddings.
 pub struct KokoroEngine {
     voice: String,
 
     #[cfg(feature = "tts")]
-    session: Option<ort::Session>,
+    engine: Option<Arc<Mutex<kokoro_tiny::TtsEngine>>>,
 
     loaded: bool,
 }
@@ -25,13 +33,17 @@ impl KokoroEngine {
         Self {
             voice: voice.unwrap_or(TTS_DEFAULT_VOICE).to_string(),
             #[cfg(feature = "tts")]
-            session: None,
+            engine: None,
             loaded: false,
         }
     }
 
     fn model_path() -> Result<std::path::PathBuf> {
         Ok(models_dir()?.join("kokoro").join(KOKORO_MODEL_FILENAME))
+    }
+
+    fn voices_path() -> Result<std::path::PathBuf> {
+        Ok(models_dir()?.join("kokoro").join(KOKORO_VOICES_FILENAME))
     }
 }
 
@@ -45,6 +57,7 @@ impl TtsEngine for KokoroEngine {
         #[cfg(feature = "tts")]
         {
             let model_path = Self::model_path()?;
+            let voices_path = Self::voices_path()?;
 
             if !model_path.exists() {
                 anyhow::bail!(
@@ -52,22 +65,27 @@ impl TtsEngine for KokoroEngine {
                     model_path.display()
                 );
             }
+            if !voices_path.exists() {
+                anyhow::bail!(
+                    "Kokoro voices file not found at {}. Run first-time setup.",
+                    voices_path.display()
+                );
+            }
 
-            let path = model_path
+            let model_str = model_path
                 .to_str()
-                .context("Model path contains invalid UTF-8")?
+                .context("Kokoro model path contains invalid UTF-8")?
+                .to_string();
+            let voices_str = voices_path
+                .to_str()
+                .context("Kokoro voices path contains invalid UTF-8")?
                 .to_string();
 
-            let session = tokio::task::spawn_blocking(move || {
-                ort::Session::builder()
-                    .context("Failed to create ORT session builder")?
-                    .commit_from_file(path)
-                    .context("Failed to load Kokoro ONNX model")
-            })
-            .await
-            .context("Kokoro load task panicked")??;
+            let engine = kokoro_tiny::TtsEngine::with_paths(&model_str, &voices_str)
+                .await
+                .map_err(|e| anyhow::anyhow!("Kokoro load failed: {}", e))?;
 
-            self.session = Some(session);
+            self.engine = Some(Arc::new(Mutex::new(engine)));
             self.loaded = true;
             info!("Kokoro model loaded (voice: {})", self.voice);
             return Ok(());
@@ -88,21 +106,26 @@ impl TtsEngine for KokoroEngine {
 
         #[cfg(feature = "tts")]
         {
-            let _session = self
-                .session
+            let engine = self
+                .engine
                 .as_ref()
-                .context("Kokoro session unexpectedly None")?;
+                .context("Kokoro engine unexpectedly None")?
+                .clone();
+            let text = text.to_string();
+            let voice = self.voice.clone();
 
-            // TODO: implement tokenization + ORT inference when testing at home.
-            // Kokoro expects:
-            //   input_ids: [1, seq_len] int64 — phoneme token IDs
-            //   style: [1, 256] float32 — voice style embedding for self.voice
-            //   speed: [1] float32 — playback speed (1.0 = normal)
-            // Output:
-            //   audio: [1, samples] float32 — raw PCM at 24kHz
-            //
-            // Reference tokenizer: https://github.com/thewh1teagle/kokoro-onnx
-            anyhow::bail!("Kokoro inference not yet implemented — complete at home");
+            let audio = tokio::task::spawn_blocking(move || -> Result<Vec<f32>> {
+                let mut guard = engine
+                    .lock()
+                    .map_err(|_| anyhow::anyhow!("Kokoro engine mutex poisoned"))?;
+                guard
+                    .synthesize(&text, Some(&voice))
+                    .map_err(|e| anyhow::anyhow!("Kokoro synthesize failed: {}", e))
+            })
+            .await
+            .context("Kokoro synthesize task panicked")??;
+
+            return Ok(audio);
         }
 
         #[cfg(not(feature = "tts"))]
@@ -114,7 +137,7 @@ impl TtsEngine for KokoroEngine {
     fn unload(&mut self) {
         #[cfg(feature = "tts")]
         {
-            self.session = None;
+            self.engine = None;
         }
         if self.loaded {
             self.loaded = false;
