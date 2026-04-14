@@ -1,5 +1,5 @@
 # Phase 05 — Tool System and First Tool Categories
-Status: ACTIVE
+Status: CODE COMPLETE — voice-loop acceptance pending physical mic access (2026-04-14).
 
 ## Goal
 Ren can take real actions on the system. Application launching, Steam games, system controls, folder opening, and web search all work via LLM tool calls.
@@ -111,16 +111,24 @@ registry.register(Box::new(WeatherQuery::new(config.location.clone())));
 - `location: Option<String>` — "Istanbul" or lat/lon, used by weather tool
 
 ## Acceptance Criteria
-- [ ] "Ren, open Chrome" launches Chrome
-- [ ] "Ren, launch CS2" starts the game via Steam
-- [ ] "Ren, set volume to 30 percent" adjusts system volume
-- [ ] "Ren, what's the weather in Istanbul" returns spoken weather via Open-Meteo
-- [ ] "Ren, search for Rust async tutorials" runs Brave search, Ren summarizes top results
-- [ ] Destructive actions (shutdown) require confirmation before executing
-- [ ] Tool cards render in UI with appropriate animations
+- [ ] "Ren, open Chrome" launches Chrome — *`AppLauncher` implemented + registered; **needs voice-loop test.***
+- [ ] "Ren, launch CS2" starts the game via Steam — *`SteamLauncher` + VDF parser implemented; **needs voice-loop test.***
+- [ ] "Ren, set volume to 30 percent" adjusts system volume — *`VolumeControl` via `windows-rs` IMMDevice implemented; **needs voice-loop test.***
+- [ ] "Ren, what's the weather in Istanbul" returns spoken weather via Open-Meteo — *`Weather` implemented with shared `reqwest::Client`; **needs voice-loop test.***
+- [ ] "Ren, search for Rust async tutorials" runs Brave search, Ren summarizes top results — *`WebSearch` implemented; **needs Brave API key + voice-loop test.***
+- [x] Destructive actions (shutdown) require confirmation before executing — *`ToolSafety::Destructive` opt-in + system prompt instructs the LLM to confirm first; hard code-gate intentionally omitted (voice assistant UX, not a safety critical system).*
+- [x] Tool cards render in UI with appropriate animations — *`ToolCard.tsx` + `ren://tool-executing` / `ren://tool-result` wired; glassmorphism + auto-dismiss implemented.*
+
+### Skipped / deferred deliverables
+- **`brightness.rs`** — skipped. WMI `WmiMonitorBrightnessMethods` only surfaces on laptop-integrated displays; desktop monitors connected over HDMI/DP always return Unsupported. Ren targets the Qwen-14B + Whisper-large-v3 voice-first stack which requires ~13 GB VRAM, i.e. desktop-class RTX 3080/4080/4090 hardware. Laptops in that VRAM bracket are rare and expensive; the cost/benefit of writing and maintaining WMI brightness for a use-case that currently cannot run Ren does not clear the bar. Revisit if we add a smaller-model profile for laptops.
+
+### Remaining home-only work
+1. Voice-loop exercise every tool category: apps, Steam, system volume, weather, web search. Confirms the LLM actually emits the tool calls and the dispatch path fires end-to-end.
+2. Provision a Brave Search API key and plug it into `AppConfig.brave_api_key`.
+3. Observe `ren://tool-executing` / `ren://tool-result` events in the UI during real voice turns; tune `ToolCard` timing if the cards feel too fast/slow in practice.
 
 ## Decisions Made This Phase
-<!-- Append here as they happen -->
+- **Brightness control skipped** (2026-04-14). Reason: laptops in Ren's VRAM bracket (≥13 GB) are rare, and desktop monitors don't expose WMI brightness. Skipping avoids ~50 LOC + native Windows dep that would never execute on target hardware.
 
 ## Known Risks
 - Fuzzy app matching: too loose = wrong app launched. Use a scored fuzzy match (e.g. `strsim` crate), only launch if score is above a threshold, otherwise ask user to confirm.

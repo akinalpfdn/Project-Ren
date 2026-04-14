@@ -2,7 +2,7 @@
 Last updated: 2026-04-14 (Phase 2 home-verified; runtime blockers cleared)
 
 ## Active Phase
-**Phase 5** — Tool system and first tool categories
+**Phase 6** — next up (settings panel / first-run UX per devplan).
 
 ## Phase Files
 | File | Status |
@@ -11,8 +11,8 @@ Last updated: 2026-04-14 (Phase 2 home-verified; runtime blockers cleared)
 | `.claude/phases/PHASE-02-done.md` | DONE (home-verified: CUDA Whisper end-to-end Turkish) |
 | `.claude/phases/PHASE-03-done.md` | CODE COMPLETE (Kokoro wired via `kokoro-tiny`; runtime gated by CUDA backend conflict + physical-mic tests) |
 | `.claude/phases/PHASE-04-done.md` | CODE COMPLETE (wake consumer wired into pipeline; needs Picovoice key + .ppn resources + mic test) |
-| `.claude/phases/PHASE-05-active.md` | ACTIVE ← you are here |
-| `.claude/phases/PHASE-06-pending.md` | PENDING |
+| `.claude/phases/PHASE-05-done.md` | CODE COMPLETE (brightness skipped; voice-loop acceptance deferred to physical) |
+| `.claude/phases/PHASE-06-pending.md` | PENDING ← next up |
 | `.claude/phases/PHASE-07-pending.md` | PENDING |
 
 ## What Exists in the Repo Right Now

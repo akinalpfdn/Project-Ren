@@ -10,6 +10,7 @@ mod hotkey;
 mod llm;
 mod playback;
 mod state;
+mod storage;
 mod stt;
 mod tools;
 mod tts;
