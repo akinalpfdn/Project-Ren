@@ -120,7 +120,7 @@ const OrbCore = ({ state, amplitudes }: { state: RenState; amplitudes: number[] 
 
     mountRef.current.appendChild(renderer.domElement);
 
-    const geometry = new THREE.IcosahedronGeometry(1.1, 9);
+    const geometry = new THREE.IcosahedronGeometry(1.2, 32);
 
     const material = new THREE.ShaderMaterial({
       vertexShader,
@@ -131,8 +131,8 @@ const OrbCore = ({ state, amplitudes }: { state: RenState; amplitudes: number[] 
         uSpeed: { value: 0.5 },
         uNoiseDensity: { value: 1.5 },
         uNoiseStrength: { value: 0.2 },
-        uColorTop: { value: new THREE.Color("#00bbbb") }, // Darker Cyan
-        uColorBottom: { value: new THREE.Color("#00bbbb") } // Darker Cyan
+        uColorTop: { value: new THREE.Color("#42bcf5") },
+        uColorBottom: { value: new THREE.Color("#9c27b0") }
       }
     });
     materialRef.current = material;
