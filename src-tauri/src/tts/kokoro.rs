@@ -112,6 +112,18 @@ impl TtsEngine for KokoroEngine {
             let arr = [chunk[0], chunk[1], chunk[2], chunk[3]];
             samples.push(f32::from_le_bytes(arr));
         }
+
+        // Debug dump — overwritten on every turn. Lets us play the raw
+        // Kokoro output in an external player and confirm whether any
+        // leading audio is actually missing from the buffer we hand to
+        // playback, versus being clipped by the rodio/audio path.
+        if let Ok(log_dir) = crate::config::app_data_dir() {
+            let dump = log_dir.join("logs").join("last_tts.wav");
+            if let Err(e) = dump_wav(&dump, &samples, KOKORO_SAMPLE_RATE) {
+                tracing::warn!("TTS dump failed: {}", e);
+            }
+        }
+
         Ok(samples)
     }
 
@@ -128,4 +140,33 @@ impl TtsEngine for KokoroEngine {
     fn sample_rate(&self) -> u32 {
         KOKORO_SAMPLE_RATE
     }
+}
+
+/// Minimal 32-bit float PCM WAV writer for diagnostic dumps.
+fn dump_wav(path: &std::path::Path, samples: &[f32], sample_rate: u32) -> Result<()> {
+    use std::io::Write;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    let mut f = std::fs::File::create(path).context("create wav dump")?;
+    let data_size = (samples.len() * 4) as u32;
+    let riff_size = 36 + data_size;
+    f.write_all(b"RIFF")?;
+    f.write_all(&riff_size.to_le_bytes())?;
+    f.write_all(b"WAVE")?;
+    f.write_all(b"fmt ")?;
+    f.write_all(&16u32.to_le_bytes())?;
+    f.write_all(&3u16.to_le_bytes())?; // IEEE float
+    f.write_all(&1u16.to_le_bytes())?; // mono
+    f.write_all(&sample_rate.to_le_bytes())?;
+    let byte_rate = sample_rate * 4;
+    f.write_all(&byte_rate.to_le_bytes())?;
+    f.write_all(&4u16.to_le_bytes())?; // block align
+    f.write_all(&32u16.to_le_bytes())?; // bits per sample
+    f.write_all(b"data")?;
+    f.write_all(&data_size.to_le_bytes())?;
+    for s in samples {
+        f.write_all(&s.to_le_bytes())?;
+    }
+    Ok(())
 }

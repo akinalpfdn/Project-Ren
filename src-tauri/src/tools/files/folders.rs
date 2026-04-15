@@ -51,8 +51,15 @@ impl Tool for OpenFolder {
     }
 
     async fn execute(&self, args: Value) -> Result<ToolResult, ToolError> {
+        // Accept every reasonable key the model tends to invent —
+        // `folder` is canonical but Qwen flips to `path`, `folder_path`,
+        // `dir`, `directory` between turns.
         let raw = args
             .get("folder")
+            .or_else(|| args.get("path"))
+            .or_else(|| args.get("folder_path"))
+            .or_else(|| args.get("dir"))
+            .or_else(|| args.get("directory"))
             .and_then(|v| v.as_str())
             .map(str::trim)
             .filter(|s| !s.is_empty())
@@ -94,17 +101,20 @@ fn display_name(key: &str) -> &'static str {
 }
 
 fn resolve_folder(key: &str) -> Option<PathBuf> {
-    let home = std::env::var("USERPROFILE").ok().map(PathBuf::from)?;
-    let suffix = match key {
-        "downloads" => "Downloads",
-        "documents" => "Documents",
-        "desktop" => "Desktop",
-        "pictures" => "Pictures",
-        "music" => "Music",
-        "videos" => "Videos",
-        _ => return None,
+    // Windows 10/11 with OneDrive redirects Desktop / Documents / Pictures
+    // away from `%USERPROFILE%`. `UserDirs` goes through
+    // SHGetKnownFolderPath and returns the real current location.
+    let user = directories::UserDirs::new()?;
+    let path: Option<&Path> = match key {
+        "downloads" => user.download_dir(),
+        "documents" => user.document_dir(),
+        "desktop" => user.desktop_dir(),
+        "pictures" => user.picture_dir(),
+        "music" => user.audio_dir(),
+        "videos" => user.video_dir(),
+        _ => None,
     };
-    Some(home.join(suffix))
+    path.map(PathBuf::from)
 }
 
 #[cfg(windows)]

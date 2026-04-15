@@ -1,8 +1,6 @@
 use anyhow::{Context, Result};
-use rodio::source::Source;
 use rodio::{OutputStream, Sink};
 use serde::Serialize;
-use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info};
@@ -55,40 +53,28 @@ impl AudioPlayer {
                     }
                 };
 
-                // Keep the OS audio endpoint warm. Without this the device
-                // power-saves between TTS turns and the first ~100-300 ms of
-                // each playback gets clipped while it wakes up. A silent,
-                // infinite source consumes <1% CPU and zero audible energy.
-                let warm_sink = match Sink::try_new(&handle) {
+                // One long-lived sink handles every TTS turn. Creating a
+                // fresh sink per play() loses the first ~100 ms while
+                // rodio re-registers it with the mixer; reusing one sink
+                // keeps the stream continuously clocked so appended audio
+                // starts on the next mixer tick.
+                let play_sink = match Sink::try_new(&handle) {
                     Ok(s) => s,
                     Err(e) => {
-                        error!("Could not create warm sink: {}", e);
+                        error!("Could not create playback sink: {}", e);
                         return;
                     }
                 };
-                let warm_source = rodio::source::Zero::<f32>::new(1, 24_000)
-                    .take_duration(Duration::from_secs(60 * 60 * 24))
-                    .repeat_infinite();
-                warm_sink.append(warm_source);
-                // Keep volume low and never drop the sink — it lives as long
-                // as the audio thread does, which is the whole app.
-                warm_sink.set_volume(0.0);
-                std::mem::forget(warm_sink);
 
                 while let Some(cmd) = cmd_rx.blocking_recv() {
-                    let result = (|| -> Result<()> {
-                        let sink = Sink::try_new(&handle)
-                            .context("Failed to create audio sink")?;
-                        let source = rodio::buffer::SamplesBuffer::new(
-                            1,
-                            cmd.sample_rate,
-                            cmd.buffer,
-                        );
-                        sink.append(source);
-                        sink.sleep_until_end();
-                        Ok(())
-                    })();
-                    let _ = cmd.done.send(result);
+                    let source = rodio::buffer::SamplesBuffer::new(
+                        1,
+                        cmd.sample_rate,
+                        cmd.buffer,
+                    );
+                    play_sink.append(source);
+                    play_sink.sleep_until_end();
+                    let _ = cmd.done.send(Ok(()));
                 }
             })
             .context("Failed to spawn audio thread")?;
