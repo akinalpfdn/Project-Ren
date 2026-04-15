@@ -103,20 +103,18 @@ impl SttEngine for WhisperEngine {
                 let mut p = whisper_rs::FullParams::new(
                     whisper_rs::SamplingStrategy::Greedy { best_of: 1 },
                 );
-                p.set_language(Some("tr"));
+                p.set_language(Some("en"));
                 p.set_translate(false);
                 p.set_print_progress(false);
                 p.set_print_realtime(false);
                 p.set_print_special(false);
-                // Suppress Whisper's Turkish-subtitle hallucination ("Altyazı: M.K.",
-                // "Altyazı çevirmeni: …") which surfaces on pauses and silent tail-ends.
-                // Higher no_speech threshold skips low-confidence silent windows;
-                // suppress_blank kills empty-token predictions; the initial prompt
-                // anchors the model to a command domain instead of movie credits.
+                // Anchor the model to a command-style English domain so it
+                // does not fall back to subtitle / movie-credit hallucinations
+                // when the audio window is silent or noisy.
                 p.set_no_speech_thold(0.6);
                 p.set_suppress_blank(true);
                 p.set_initial_prompt(
-                    "Kısa sesli komutlar. Asistan konuşması. Film altyazısı değildir.",
+                    "Short voice commands. Personal assistant dialogue. Not movie subtitles.",
                 );
                 p
             };

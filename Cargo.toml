@@ -1,0 +1,8 @@
+# Workspace root for Project Ren.
+# - `src-tauri/` houses the Tauri app (`ren.exe`) and stays where Tauri CLI expects it.
+# - `crates/ren-tts/` is the Kokoro TTS sidecar (`ren-tts.exe`), spawned by the
+#   main app to keep ORT's CUDA backend out of the main process address space
+#   (whisper.cpp + ORT cannot share a process — they crash on init).
+[workspace]
+members = ["src-tauri", "crates/ren-tts"]
+resolver = "2"

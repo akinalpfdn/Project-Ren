@@ -230,6 +230,23 @@ pub fn run() {
                 }
             });
 
+            // ren-tts sidecar — owns ORT/CUDA in its own process so it cannot
+            // collide with whisper.cpp's CUDA backend living in this one.
+            let tts_child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
+            let tts_child_clone = tts_child.clone();
+            let tts_voice_for_spawn = config.tts_voice.clone();
+            tauri::async_runtime::spawn(async move {
+                match tts::process::start(&tts_voice_for_spawn).await {
+                    Ok(child) => {
+                        *tts_child_clone.lock().unwrap() = Some(child);
+                        info!("ren-tts sidecar ready");
+                    }
+                    Err(e) => {
+                        warn!("ren-tts not started: {} — TTS disabled", e);
+                    }
+                }
+            });
+
             // TTS sentence consumer
             let kokoro_clone = kokoro.clone();
             let player_clone = player.clone();
@@ -318,10 +335,14 @@ pub fn run() {
                 // window is truly see-through on Windows.
                 let _ = window.set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));
                 let ollama_on_exit = ollama_child.clone();
+                let tts_on_exit = tts_child.clone();
                 window.on_window_event(move |event| {
                     if matches!(event, tauri::WindowEvent::Destroyed) {
                         if let Some(child) = ollama_on_exit.lock().unwrap().as_mut() {
                             llm::ollama_process::terminate(child);
+                        }
+                        if let Some(child) = tts_on_exit.lock().unwrap().as_mut() {
+                            tts::process::terminate(child);
                         }
                     }
                 });

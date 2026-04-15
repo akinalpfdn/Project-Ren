@@ -70,6 +70,7 @@ pub async fn run_turn(
                         let sentence = sentence_buf[..boundary].trim().to_string();
                         sentence_buf = sentence_buf[boundary..].to_string();
                         if !sentence.is_empty() {
+                            tracing::info!("LLM sentence -> TTS: {:?}", sentence);
                             let _ = sentence_tx_ref.try_send(sentence);
                         }
                     }
@@ -77,6 +78,7 @@ pub async fn run_turn(
                 StreamChunk::Done(_) => {
                     let tail = sentence_buf.trim().to_string();
                     if !tail.is_empty() {
+                        tracing::info!("LLM sentence -> TTS (tail): {:?}", tail);
                         let _ = sentence_tx_ref.try_send(tail);
                     }
                 }

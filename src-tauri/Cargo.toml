@@ -75,16 +75,10 @@ sysinfo             = "0.32"
 # Audio playback (TTS output)
 rodio               = "0.19"
 
-# ONNX Runtime (Kokoro TTS)
-# Optional: only links native ORT when "tts" feature is enabled.
-ort                 = { version = "=2.0.0-rc.10", optional = true }
-
-# ndarray for audio tensor manipulation
-ndarray             = { version = "0.16", optional = true }
-
-# Kokoro TTS — minimal embedding-focused crate on top of ort + rodio.
-# Gated on the "tts" feature; brings phonemizer + voice embeddings + inference.
-kokoro-tiny         = { version = "0.1", optional = true }
+# Kokoro TTS now lives in the `ren-tts` sidecar binary so its bundled ORT
+# CUDA backend never collides with whisper.cpp's CUDA backend in this
+# process. The main app talks to the sidecar over localhost HTTP using the
+# `reqwest` client already pulled in for downloads.
 
 # Sentence splitting for streaming TTS pipeline
 unicode-segmentation = "1"
@@ -123,7 +117,6 @@ windows             = { version = "0.61", features = [
 default = []
 # Enable real Whisper STT — requires whisper.cpp native build (C++ toolchain + CMake).
 stt = ["whisper-rs"]
-# Enable real Kokoro TTS — requires ONNX Runtime native library.
-tts = ["ort", "ndarray", "kokoro-tiny"]
+# Real TTS is always-on via the `ren-tts` sidecar binary; no extra feature flag.
 # Enable Porcupine wake word detection — requires Picovoice native library at runtime.
 wake = ["pv_porcupine"]

@@ -9,11 +9,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useRenStore } from '../store';
 import type { RenState } from '../types';
-import { WAVEFORM_BAR_COUNT } from '../config/ui';
 import styles from './Orb.module.css';
-
-const PARTICLE_COUNT = 4;
-const WAVEFORM_MIN_SCALE = 0.15;
 
 const vertexShader = `
 uniform float uTime;
@@ -132,7 +128,7 @@ const OrbCore = ({ state, amplitudes }: { state: RenState; amplitudes: number[] 
         uNoiseDensity: { value: 1.5 },
         uNoiseStrength: { value: 0.2 },
         uColorTop: { value: new THREE.Color("#42bcf5") },
-        uColorBottom: { value: new THREE.Color("#9c27b0") }
+        uColorBottom: { value: new THREE.Color("#0a2472") }
       }
     });
     materialRef.current = material;
@@ -233,48 +229,6 @@ const OrbCore = ({ state, amplitudes }: { state: RenState; amplitudes: number[] 
   return <div ref={mountRef} className={styles.core} aria-hidden="true" />;
 };
 
-const StateVisual = ({
-  state,
-  amplitudes,
-}: {
-  state: RenState;
-  amplitudes: number[];
-}) => {
-  if (state === 'thinking') {
-    return (
-      <div className={styles.particles}>
-        {Array.from({ length: PARTICLE_COUNT }, (_, i) => (
-          <div key={i} className={styles.particle} />
-        ))}
-      </div>
-    );
-  }
-
-  // Removing standard waveform as voice now actively distorts 3D mesh
-  // If the user still wants the waveform, they can uncomment this:
-  /*
-  if (state === 'speaking') {
-    return (
-      <div className={styles.waveform}>
-        {Array.from({ length: WAVEFORM_BAR_COUNT }, (_, i) => {
-          const amp = amplitudes[i] ?? 0;
-          const scale = Math.max(WAVEFORM_MIN_SCALE, amp);
-          return (
-            <div
-              key={i}
-              className={styles.waveBar}
-              style={{ transform: `scaleY(${scale})` }}
-            />
-          );
-        })}
-      </div>
-    );
-  }
-  */
-
-  return null;
-};
-
 export const Orb = () => {
   const currentState = useRenStore((s) => s.currentState);
   const waveformAmplitudes = useRenStore((s) => s.waveformAmplitudes);
@@ -289,7 +243,6 @@ export const Orb = () => {
         transition={{ duration: 0.5, ease: 'easeOut' }}
       >
         <OrbCore state={currentState} amplitudes={waveformAmplitudes} />
-        <StateVisual state={currentState} amplitudes={waveformAmplitudes} />
       </motion.div>
     </div>
   );

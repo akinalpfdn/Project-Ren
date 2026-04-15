@@ -1,0 +1,37 @@
+[package]
+name        = "ren-tts"
+version     = "0.1.0"
+edition     = "2021"
+description = "Kokoro TTS sidecar for Project Ren — exposes a localhost HTTP API so ORT/CUDA stays out of the main app process."
+license     = "Apache-2.0 OR MIT"
+publish     = false
+
+[[bin]]
+name = "ren-tts"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime + HTTP server
+tokio        = { version = "1", features = ["full"] }
+axum         = "0.7"
+tower        = "0.5"
+tower-http   = { version = "0.6", features = ["trace"] }
+hyper        = { version = "1", features = ["server"] }
+
+# Kokoro TTS — owns ORT here, no longer in the main app
+kokoro-tiny  = "0.1"
+
+# Serialization + error handling
+serde        = { version = "1", features = ["derive"] }
+serde_json   = "1"
+anyhow       = "1"
+
+# Logging
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# CLI flags (accept --port, --model, --voices)
+clap         = { version = "4", features = ["derive"] }
+
+# Path helpers
+directories  = "5"

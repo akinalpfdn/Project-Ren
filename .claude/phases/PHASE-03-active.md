@@ -1,4 +1,49 @@
 # Phase 03 — Local LLM via Portable Ollama, and TTS
+Status: ACTIVE — reopened to resolve in-process CUDA conflict (Whisper + ORT) by extracting Kokoro into a sidecar binary modeled on Ollama's process pattern.
+
+## Reopen Reason (2026-04-15)
+Running `_dev-full.bat` (`stt,tts,wake`) crashes with a CRT debug assertion (`_osfile(fh) & FOPEN`) followed by `STATUS_STACK_BUFFER_OVERRUN`. Root cause: whisper-rs (whisper.cpp CUDA backend) and `ort` (downloaded ONNX Runtime DLL with CUDA EP bundled) both initialise CUDA in the same process; their CRT/ABI assumptions are incompatible.
+
+## Plan — Kokoro Sidecar
+Mirror the existing Ollama-as-child-process architecture:
+
+1. Convert `src-tauri/` into a Cargo workspace with two member crates:
+   - `crates/ren-app/` — current Tauri app, **without** ORT or `kokoro-tiny`.
+   - `crates/ren-tts/` — new minimal binary owning Kokoro.
+2. `ren-tts` exposes a localhost HTTP API:
+   - `POST /synthesize` `{ "text": ..., "voice": ... }` -> `audio/octet-stream` raw `f32` PCM, `X-Sample-Rate` header.
+   - `GET /health` -> 200 OK once the model is loaded.
+3. Lifecycle copies `llm/ollama_process.rs`:
+   - Random localhost port pick (avoid 11500-11520 used by Ollama).
+   - Windows Job Object so the child dies with the parent.
+   - Health-check polling, ready signal feeds the existing TTS path.
+4. `ren-app/src/tts/` gains an `HttpKokoroClient` that implements `TtsEngine` and talks to the sidecar.
+5. Models stay shared: both binaries read from `%APPDATA%\Ren\models\kokoro\`.
+6. `tauri.conf.json` lists `ren-tts.exe` under `externalBin`; build copies it next to `ren.exe`.
+7. Dev scripts:
+   - `_dev-full.bat` for `ren-app` no longer needs `tts` feature, only `stt,wake`.
+   - `_dev-tts.bat` (new) builds and runs the sidecar standalone for direct testing.
+
+## Tasks
+- [ ] Workspace refactor (`Cargo.toml` root + members, move existing code into `crates/ren-app/`).
+- [ ] `crates/ren-tts/` skeleton (Cargo.toml, `main.rs`, axum server stub).
+- [ ] Move Kokoro engine + model loading into `ren-tts`.
+- [ ] Implement `/synthesize` and `/health` endpoints.
+- [ ] Strip `ort`, `ndarray`, `kokoro-tiny` from `ren-app/Cargo.toml` and the `tts` feature.
+- [ ] New `HttpKokoroClient` in `ren-app/src/tts/http.rs`.
+- [ ] Sidecar lifecycle in `ren-app/src/lib.rs` setup hook (spawn + Job Object + health-check + terminate).
+- [ ] `tauri.conf.json` `externalBin` entry + dev script updates.
+- [ ] End-to-end test: STT (CUDA) + LLM (Ollama) + TTS (sidecar) + Wake — full voice loop.
+
+## Acceptance Criteria
+- `_dev-full.bat` boots without CRT/GS-cookie crash.
+- Voice loop completes a full turn end-to-end on the home machine.
+- Killing `ren.exe` from Task Manager terminates `ren-tts.exe` automatically.
+- Running `ren-tts.exe` standalone responds to `curl -X POST http://localhost:<port>/synthesize`.
+
+---
+
+## (Pre-Reopen) — original Phase 03 notes
 Status: COMPLETE (code complete on work computer; runtime + model verification pending at home)
 
 ## Goal
