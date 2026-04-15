@@ -902,43 +902,57 @@ async fn tts_sentence_loop(
     kokoro: SharedKokoro,
     player: Arc<AudioPlayer>,
 ) {
-    while let Some(sentence) = sentence_rx.recv().await {
-        // Lazy load Kokoro
-        {
-            let mut guard = kokoro.lock().await;
-            if !guard.is_loaded() {
-                if let Err(e) = guard.load().await {
-                    drop(guard);
-                    sm.lock()
-                        .unwrap()
-                        .emit_error("tts_load_failed", &e.to_string());
-                    continue;
+    // Pipelined TTS: one task synthesises the next sentence while the
+    // previous one is still playing. With the old sequential loop, the
+    // silence between two spoken sentences was `synthesis_time + LLM_gap`;
+    // pipelining hides the synthesis cost behind the previous playback.
+    let (audio_tx, mut audio_rx) = mpsc::channel::<(u32, crate::tts::AudioBuffer)>(2);
+
+    let synth_kokoro = kokoro.clone();
+    let synth_sm = sm.clone();
+    let synth_handle = tauri::async_runtime::spawn(async move {
+        while let Some(sentence) = sentence_rx.recv().await {
+            {
+                let mut guard = synth_kokoro.lock().await;
+                if !guard.is_loaded() {
+                    if let Err(e) = guard.load().await {
+                        drop(guard);
+                        synth_sm
+                            .lock()
+                            .unwrap()
+                            .emit_error("tts_load_failed", &e.to_string());
+                        continue;
+                    }
                 }
             }
-        }
 
+            let (sample_rate, audio) = {
+                let engine = synth_kokoro.lock().await;
+                let sr = engine.sample_rate();
+                let a = engine.synthesize(&sentence).await;
+                (sr, a)
+            };
+
+            match audio {
+                Ok(buffer) => {
+                    if audio_tx.send((sample_rate, buffer)).await.is_err() {
+                        break;
+                    }
+                }
+                Err(e) => warn!("TTS synthesis failed: {} — skipping sentence", e),
+            }
+        }
+    });
+
+    while let Some((sample_rate, buffer)) = audio_rx.recv().await {
         sm.lock().unwrap().transition(RenState::Speaking).ok();
-
-        let (sample_rate, audio) = {
-            let engine = kokoro.lock().await;
-            let sr = engine.sample_rate();
-            let a = engine.synthesize(&sentence).await;
-            (sr, a)
-        };
-
-        match audio {
-            Ok(buffer) => {
-                if let Err(e) = player.play(&app, buffer, sample_rate).await {
-                    warn!("Playback error: {}", e);
-                }
-            }
-            Err(e) => {
-                warn!("TTS synthesis failed: {} — skipping sentence", e);
-            }
+        if let Err(e) = player.play(&app, buffer, sample_rate).await {
+            warn!("Playback error: {}", e);
         }
-
         sm.lock().unwrap().transition(RenState::Idle).ok();
     }
+
+    let _ = synth_handle.await;
 }
 
 // ─── Tauri helpers ────────────────────────────────────────────────────────────

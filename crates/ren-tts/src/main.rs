@@ -195,19 +195,15 @@ async fn synthesize(
         *guard = Some(engine);
     }
 
-    // `kokoro-tiny` 0.1 skips the boundary padding tokens Kokoro expects,
-    // so the first few phonemes get eaten as "warm-up" and the start of
-    // the sentence is lost. We prepend a short filler phrase, synthesise
-    // the combined text, then strip the filler's worth of leading samples
-    // before returning. Dumb but stable until we fork the crate.
-    const FILLER: &str = "Mm. ";
-    const FILLER_MS: usize = 400;
-
-    let padded = format!("{}{}", FILLER, text);
+    // Synthesis is CPU-heavy and synchronous; drop the lock onto a
+    // blocking task so the async runtime can keep serving /health while
+    // it runs. The vendored kokoro-tiny fork adds the boundary padding
+    // tokens Kokoro expects, so no filler prefix or trim is needed here.
     let engine = guard.take().expect("engine just loaded");
+    let text_owned = text.to_string();
     let (engine, samples) = tokio::task::spawn_blocking(move || {
         let mut engine = engine;
-        let result = engine.synthesize(&padded, Some(&voice));
+        let result = engine.synthesize(&text_owned, Some(&voice));
         (engine, result)
     })
     .await
@@ -226,13 +222,6 @@ async fn synthesize(
             format!("Kokoro synthesize failed: {}", e),
         )
     })?;
-
-    let trim = (KOKORO_SAMPLE_RATE as usize * FILLER_MS) / 1000;
-    let samples: Vec<f32> = if samples.len() > trim {
-        samples.into_iter().skip(trim).collect()
-    } else {
-        samples
-    };
 
     let mut bytes = Vec::with_capacity(samples.len() * 4);
     for s in samples {

@@ -5,4 +5,7 @@
 #   (whisper.cpp + ORT cannot share a process — they crash on init).
 [workspace]
 members = ["src-tauri", "crates/ren-tts"]
+# Vendored upstream crates are path-deps, not workspace members — Cargo
+# otherwise picks them up automatically and fails the manifest validation.
+exclude = ["crates/ren-tts/vendor"]
 resolver = "2"

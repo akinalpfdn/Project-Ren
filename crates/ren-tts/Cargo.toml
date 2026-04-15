@@ -18,8 +18,10 @@ tower        = "0.5"
 tower-http   = { version = "0.6", features = ["trace"] }
 hyper        = { version = "1", features = ["server"] }
 
-# Kokoro TTS — owns ORT here, no longer in the main app
-kokoro-tiny  = "0.1"
+# Kokoro TTS — owns ORT here, no longer in the main app. Vendored
+# locally so we can keep a one-line patch that adds the boundary
+# padding tokens Kokoro expects but the upstream crate skips.
+kokoro-tiny  = { path = "vendor/kokoro-tiny" }
 
 # Serialization + error handling
 serde        = { version = "1", features = ["derive"] }
